@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://data/questions/kasaysayan.csv.import)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://data/questions/kasaysayan.csv.import"
+    }
+  ],
+  "id": "000036",
+  "timestamp": 1791998987.0,
+  "tool": "write_file"
+}

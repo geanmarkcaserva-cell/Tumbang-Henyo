@@ -9,6 +9,7 @@ signal knocked_down
 
 var is_down := false
 var _home: Vector3
+var _pending_reset := false
 
 
 func _ready() -> void:
@@ -16,7 +17,7 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if is_down:
+	if is_down or _pending_reset:
 		return
 	var up := global_transform.basis.y.normalized()
 	var tilt := rad_to_deg(acos(clampf(up.dot(Vector3.UP), -1.0, 1.0)))
@@ -26,9 +27,18 @@ func _physics_process(_delta: float) -> void:
 		knocked_down.emit()
 
 
-## Stand the lata back up in its circle (used by the taya's Reset state later).
+## Stand the lata back up in its circle. Applied on the next physics step
+## so the physics engine doesn't fight the teleport.
 func reset_to_home() -> void:
 	is_down = false
-	linear_velocity = Vector3.ZERO
-	angular_velocity = Vector3.ZERO
-	global_transform = Transform3D(Basis.IDENTITY, _home)
+	_pending_reset = true
+	sleeping = false
+
+
+func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
+	if not _pending_reset:
+		return
+	state.transform = Transform3D(Basis.IDENTITY, _home)
+	state.linear_velocity = Vector3.ZERO
+	state.angular_velocity = Vector3.ZERO
+	_pending_reset = false

@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/quiz_panel.tscn)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/quiz_panel.tscn"
+    }
+  ],
+  "id": "000042",
+  "timestamp": 1791999091.0,
+  "tool": "write_file"
+}

@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://autoload/quiz_database.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://autoload/quiz_database.gd"
+    }
+  ],
+  "id": "000039",
+  "timestamp": 1791999008.0,
+  "tool": "write_file"
+}

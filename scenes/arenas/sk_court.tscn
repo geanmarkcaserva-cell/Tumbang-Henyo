@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://bmr6t7h0j7vth"]
 
 [ext_resource type="PackedScene" path="res://scenes/game/lata.tscn" id="1_lata"]
+[ext_resource type="PackedScene" path="res://scenes/game/taya.tscn" id="2_c0blr"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.32, 0.52, 0.82, 1)
@@ -63,9 +64,6 @@ albedo_color = Color(1, 0.45, 0.1, 1)
 
 [sub_resource type="StandardMaterial3D" id="mat_sign"]
 albedo_color = Color(0.8, 0.15, 0.15, 1)
-
-[sub_resource type="StandardMaterial3D" id="mat_taya"]
-albedo_color = Color(0.75, 0.2, 0.2, 1)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_frdg6"]
 size = Vector3(18, 3, 1)
@@ -295,42 +293,28 @@ text = "SK COURT"
 font_size = 72
 
 [node name="PoleL1" type="CSGBox3D" parent="Geometry" unique_id=1393046717]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 3.5, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 3.5, 2)
 use_collision = true
 size = Vector3(0.25, 7, 0.25)
 material = SubResource("mat_wall")
 
 [node name="PoleL2" type="CSGBox3D" parent="Geometry" unique_id=43869923]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 3.5, -22)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 3.5, -22)
 use_collision = true
 size = Vector3(0.25, 7, 0.25)
 material = SubResource("mat_wall")
 
 [node name="PoleR1" type="CSGBox3D" parent="Geometry" unique_id=317058992]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3.5, -12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 3.5, -12)
 use_collision = true
 size = Vector3(0.25, 7, 0.25)
 material = SubResource("mat_wall")
 
 [node name="PoleR2" type="CSGBox3D" parent="Geometry" unique_id=2108136079]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3.5, -38)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 3.5, -38)
 use_collision = true
 size = Vector3(0.25, 7, 0.25)
 material = SubResource("mat_wall")
-
-[node name="TayaPlaceholder" type="CSGCylinder3D" parent="Geometry" unique_id=551118773]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.8, -14.5)
-use_collision = true
-radius = 0.35
-height = 1.6
-material = SubResource("mat_taya")
-
-[node name="TayaLabel" type="Label3D" parent="Geometry" unique_id=1717313870]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 2, -14.5)
-billboard = 1
-text = "TAYA"
-font_size = 48
-outline_size = 10
 
 [node name="Lata" parent="." unique_id=89871477 instance=ExtResource("1_lata")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.21, -14)
@@ -343,3 +327,6 @@ shape = SubResource("BoxShape3D_frdg6")
 
 [node name="PlayerSpawn" type="Marker3D" parent="." unique_id=643251282]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
+
+[node name="Taya" parent="." unique_id=898218167 instance=ExtResource("2_c0blr")]
+transform = Transform3D(-1, 0, 2.5351817e-06, 0, 1, 0, -2.5351817e-06, 0, -1, 1.5, 0, -15)

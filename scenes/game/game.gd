@@ -4,13 +4,16 @@ extends Node3D
 ##
 ## Debug keys in the Throw state: H = force a hit, M = force a miss.
 
-enum State { QUIZ, THROW, RUN, ROUND_CLEAR, GAME_OVER }
+enum State { QUIZ, THROW, RUN, ROUND_CLEAR, GAME_OVER, TAGGED }
 
 const MAX_AWRA := 100
 const AWRA_WRONG := 20
 const AWRA_MISS := 15
-const AWRA_TAGGED := 25 # used once the taya can tag (step 4)
+const AWRA_TAGGED := 25
+const AWRA_SLIPPER_HIT := 10
 const AWRA_ROUND_CLEAR := 10
+const SLIPPER_STAGGER_TIME := 0.5
+const SLIPPER_KNOCKBACK := 4.0
 const MISS_GRACE_TIME := 0.6 ## the lata may still be toppling after the tsinelas stops
 ## Where the player may walk while throwing: behind the throw line (z = 0),
 ## inside the court sides. Rect2(min x, min z, width, depth).
@@ -31,6 +34,7 @@ var _wind := Vector3.ZERO
 @onready var _quiz: Control = $HUD/QuizPanel
 @onready var _throw: Node3D = $ThrowController
 @onready var _lata: RigidBody3D = $Arena/Lata
+@onready var _taya: CharacterBody3D = $Arena/Taya
 @onready var _finish: Area3D = $Arena/FinishLine
 @onready var _spawn: Marker3D = $Arena/PlayerSpawn
 
@@ -38,6 +42,7 @@ var _wind := Vector3.ZERO
 func _ready() -> void:
 	_player.respawn(_spawn.global_position)
 	_player.stamina_changed.connect(_hud.set_stamina)
+	_player.dash_changed.connect(_hud.set_dash)
 	_lata.knocked_down.connect(_on_lata_knocked_down)
 	_finish.body_entered.connect(_on_finish_body_entered)
 	_quiz.answered.connect(_on_quiz_answered)
@@ -45,6 +50,10 @@ func _ready() -> void:
 	_throw.power_changed.connect(_hud.set_power)
 	_throw.thrown.connect(_on_thrown)
 	_throw.settled.connect(_on_tsinelas_settled)
+	_taya.setup(_player, _lata)
+	_taya.lata_reset.connect(_on_taya_lata_reset)
+	_taya.tagged_player.connect(_on_tagged)
+	_taya.hit_player.connect(_on_hit_by_slipper)
 	QuizDatabase.reset_run()
 	_hud.set_awra(awra, MAX_AWRA)
 	_hud.set_round(round_number)
@@ -89,6 +98,46 @@ func _preview_for_round() -> float:
 	elif round_number <= 9:
 		return 0.25
 	return 0.0
+
+
+func _taya_speed_ratio() -> float: ## taya speed vs the player's sprint
+	if round_number <= 2:
+		return 0.8
+	elif round_number <= 5:
+		return 0.88
+	elif round_number <= 9:
+		return 0.95
+	return 1.0
+
+
+func _taya_reaction_time() -> float: ## seconds between the taya's looks at you
+	if round_number <= 2:
+		return 0.4
+	elif round_number <= 5:
+		return 0.32
+	elif round_number <= 9:
+		return 0.25
+	return 0.18
+
+
+func _taya_aim_error() -> float: ## how far its throws scatter, in metres
+	if round_number <= 2:
+		return 1.2
+	elif round_number <= 5:
+		return 0.9
+	elif round_number <= 9:
+		return 0.6
+	return 0.4
+
+
+func _lata_reset_time() -> float:
+	if round_number <= 2:
+		return 3.0
+	elif round_number <= 5:
+		return 2.5
+	elif round_number <= 9:
+		return 2.0
+	return 1.5
 
 
 func _roll_wind() -> Vector3:
@@ -217,7 +266,42 @@ func _enter_run() -> void:
 	_set_player_mode(true, true)
 	_hud.show_throw_ui(false)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_hud.show_status("Lata down! Run to the finish line!")
+	_hud.show_status("Lata down! Run before the taya stands it back up!")
+	_taya.configure(_player.sprint_speed * _taya_speed_ratio(), _lata_reset_time(),
+			_taya_reaction_time(), _taya_aim_error())
+	_taya.start_reset()
+
+
+func _on_taya_lata_reset() -> void:
+	if state == State.RUN:
+		_hud.show_status("Lata is up! Takbo, the taya is chasing you!")
+
+
+func _on_hit_by_slipper() -> void:
+	if state != State.RUN or _player.is_dashing():
+		return
+	_lose_awra(AWRA_SLIPPER_HIT)
+	if state == State.GAME_OVER:
+		return
+	var away := _player.global_position - _taya.global_position
+	away.y = 0.0
+	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
+	_hud.show_status("Aray! -%d Awra" % AWRA_SLIPPER_HIT)
+
+
+func _on_tagged() -> void:
+	if state != State.RUN:
+		return
+	_set_state(State.TAGGED)
+	_set_player_mode(false, false)
+	_lose_awra(AWRA_TAGGED)
+	if state == State.GAME_OVER:
+		return
+	_hud.show_status("Taya ka! -%d Awra" % AWRA_TAGGED)
+	await get_tree().create_timer(1.8).timeout
+	if state == State.TAGGED:
+		_reset_field()
+		_enter_quiz()
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
@@ -230,6 +314,7 @@ func _on_finish_body_entered(body: Node3D) -> void:
 func _round_clear() -> void:
 	_set_state(State.ROUND_CLEAR)
 	_set_player_mode(false, false)
+	_taya.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	awra = mini(awra + AWRA_ROUND_CLEAR, MAX_AWRA)
 	_hud.set_awra(awra, MAX_AWRA)
@@ -237,10 +322,16 @@ func _round_clear() -> void:
 	await get_tree().create_timer(2.0).timeout
 	round_number += 1
 	_hud.set_round(round_number)
+	_reset_field()
+	_enter_quiz()
+
+
+## Everyone back to their starting spots for the next attempt.
+func _reset_field() -> void:
 	_throw.clear_tsinelas()
 	_player.respawn(_spawn.global_position)
 	_lata.reset_to_home()
-	_enter_quiz()
+	_taya.return_to_guard()
 
 
 func _lose_awra(amount: int) -> void:
@@ -254,6 +345,7 @@ func _game_over() -> void:
 	_set_state(State.GAME_OVER)
 	_quiz.close()
 	_throw.end()
+	_taya.stop()
 	_hud.show_throw_ui(false)
 	_set_player_mode(false, false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

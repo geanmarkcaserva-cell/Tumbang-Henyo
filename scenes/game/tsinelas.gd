@@ -7,6 +7,14 @@ extends RigidBody3D
 ## directly. The real collision shape stays slipper-sized so it lands flat.
 
 signal settled
+signal hit_target(body: Node3D) ## the hitbox caught something in target_group
+
+## Which group the forgiving hitbox looks for: "lata" for the player's
+## throws, "player" for the taya's throws.
+@export var target_group := "lata"
+## Radius of the forgiving hitbox. The player's throws get a big one,
+## the taya's throws a small one so they're dodgeable.
+@export var hit_radius := 0.4
 
 const SETTLE_SPEED := 0.3 ## below this speed (m/s) it counts as still
 const SETTLE_TIME := 0.4 ## seconds it must stay still
@@ -25,6 +33,11 @@ var _has_hit := false
 
 
 func _ready() -> void:
+	# Copy the shape so changing the radius doesn't affect other tsinelas.
+	var zone_shape: CollisionShape3D = _hit_zone.get_node("CollisionShape3D")
+	var sphere := (zone_shape.shape as SphereShape3D).duplicate() as SphereShape3D
+	sphere.radius = hit_radius
+	zone_shape.shape = sphere
 	_hit_zone.body_entered.connect(_on_hit_zone_body_entered)
 
 
@@ -56,14 +69,16 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_hit_zone_body_entered(body: Node3D) -> void:
-	if _has_hit or not body.is_in_group("lata"):
+	if _has_hit or not body.is_in_group(target_group):
 		return
 	if linear_velocity.length() < MIN_HIT_SPEED:
 		return
 	_has_hit = true
-	var lata := body as RigidBody3D
-	var push := linear_velocity * mass * HIT_PUSH
-	push.y = maxf(push.y, 0.4) # always a little lift so it tips instead of sliding
-	lata.sleeping = false
-	# Hit slightly above its middle so it topples over.
-	lata.apply_impulse(push, Vector3(0.0, 0.12, 0.0))
+	if body is RigidBody3D:
+		var rigid := body as RigidBody3D
+		var push := linear_velocity * mass * HIT_PUSH
+		push.y = maxf(push.y, 0.4) # always a little lift so it tips instead of sliding
+		rigid.sleeping = false
+		# Hit slightly above its middle so it topples over.
+		rigid.apply_impulse(push, Vector3(0.0, 0.12, 0.0))
+	hit_target.emit(body)

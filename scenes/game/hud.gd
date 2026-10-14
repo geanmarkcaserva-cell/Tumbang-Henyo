@@ -6,6 +6,8 @@ extends CanvasLayer
 @onready var _awra_bar: ProgressBar = $Margin/VBox/AwraBar
 @onready var _awra_label: Label = $Margin/VBox/AwraLabel
 @onready var _stamina_bar: ProgressBar = $Margin/VBox/StaminaBar
+@onready var _dash_bar: ProgressBar = $Margin/VBox/DashBar
+@onready var _dash_label: Label = $Margin/VBox/DashLabel
 @onready var _round_label: Label = $RoundLabel
 @onready var _status: Label = $Status
 @onready var _throw_ui: Control = $ThrowUI
@@ -27,6 +29,11 @@ func set_awra(value: int, max_value: int) -> void:
 func set_stamina(value: float, max_value: float) -> void:
 	_stamina_bar.max_value = max_value
 	_stamina_bar.value = value
+
+
+func set_dash(ready_fraction: float) -> void:
+	_dash_bar.value = ready_fraction
+	_dash_label.text = "Dash  READY" if ready_fraction >= 1.0 else "Dash"
 
 
 func set_round(number: int) -> void:

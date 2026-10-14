@@ -1,6 +1,6 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://1o50ergga4ke"]
 
-[ext_resource type="Script" path="res://scenes/game/quiz_panel.gd" id="1_quiz"]
+[ext_resource type="Script" uid="uid://b08s7glb16wi3" path="res://scenes/game/quiz_panel.gd" id="1_quiz"]
 
 [sub_resource type="StyleBoxFlat" id="style_panel"]
 content_margin_left = 40.0
@@ -13,7 +13,7 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
-[node name="QuizPanel" type="Control"]
+[node name="QuizPanel" type="Control" unique_id=1738958278]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -23,7 +23,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_quiz")
 
-[node name="Panel" type="PanelContainer" parent="."]
+[node name="Panel" type="PanelContainer" parent="." unique_id=1883421799]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -37,22 +37,22 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("style_panel")
 
-[node name="HBox" type="HBoxContainer" parent="Panel"]
+[node name="HBox" type="HBoxContainer" parent="Panel" unique_id=1990559446]
 layout_mode = 2
 theme_override_constants/separation = 48
 
-[node name="Left" type="VBoxContainer" parent="Panel/HBox"]
+[node name="Left" type="VBoxContainer" parent="Panel/HBox" unique_id=1903175596]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.3
 theme_override_constants/separation = 12
 
-[node name="Header" type="Label" parent="Panel/HBox/Left"]
+[node name="Header" type="Label" parent="Panel/HBox/Left" unique_id=1405603252]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
 text = "QUESTION:"
 
-[node name="QuestionLabel" type="Label" parent="Panel/HBox/Left"]
+[node name="QuestionLabel" type="Label" parent="Panel/HBox/Left" unique_id=2046629844]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -60,7 +60,7 @@ theme_override_font_sizes/font_size = 40
 text = "Question text"
 autowrap_mode = 3
 
-[node name="TimerBar" type="ProgressBar" parent="Panel/HBox/Left"]
+[node name="TimerBar" type="ProgressBar" parent="Panel/HBox/Left" unique_id=912407844]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 14)
 layout_mode = 2
@@ -68,40 +68,43 @@ max_value = 15.0
 value = 15.0
 show_percentage = false
 
-[node name="Feedback" type="Label" parent="Panel/HBox/Left"]
+[node name="Feedback" type="Label" parent="Panel/HBox/Left" unique_id=848065118]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
 autowrap_mode = 3
 
-[node name="Choices" type="VBoxContainer" parent="Panel/HBox"]
+[node name="Choices" type="VBoxContainer" parent="Panel/HBox" unique_id=1040173234]
 layout_mode = 2
 size_flags_horizontal = 3
-alignment = 1
 theme_override_constants/separation = 14
+alignment = 1
 
-[node name="ChoiceA" type="Button" parent="Panel/HBox/Choices"]
+[node name="ChoiceA" type="Button" parent="Panel/HBox/Choices" unique_id=1755687678]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
+focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "a)  Choice"
 alignment = 0
 autowrap_mode = 3
 
-[node name="ChoiceB" type="Button" parent="Panel/HBox/Choices"]
+[node name="ChoiceB" type="Button" parent="Panel/HBox/Choices" unique_id=244670066]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
+focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "b)  Choice"
 alignment = 0
 autowrap_mode = 3
 
-[node name="ChoiceC" type="Button" parent="Panel/HBox/Choices"]
+[node name="ChoiceC" type="Button" parent="Panel/HBox/Choices" unique_id=2040415785]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
+focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "c)  Choice"
 alignment = 0

@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/taya.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/taya.gd"
+    }
+  ],
+  "id": "000087",
+  "timestamp": 1792000499.0,
+  "tool": "write_file"
+}

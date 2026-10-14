@@ -1,0 +1,13 @@
+{
+  "args_summary": "edit_script",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000081/files/scenes/game/tsinelas.gd",
+      "kind": "snapshot",
+      "path": "res://scenes/game/tsinelas.gd"
+    }
+  ],
+  "id": "000081",
+  "timestamp": 1792000460.0,
+  "tool": "edit_script"
+}

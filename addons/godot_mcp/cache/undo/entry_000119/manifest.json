@@ -1,0 +1,13 @@
+{
+  "args_summary": "batch_execute",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000119/files/scenes/game/quiz_panel.tscn",
+      "kind": "snapshot",
+      "path": "res://scenes/game/quiz_panel.tscn"
+    }
+  ],
+  "id": "000119",
+  "timestamp": 1792001500.0,
+  "tool": "batch_execute"
+}

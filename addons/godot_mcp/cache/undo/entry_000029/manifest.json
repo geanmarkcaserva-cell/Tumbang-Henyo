@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/hud.tscn)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/hud.tscn"
+    }
+  ],
+  "id": "000029",
+  "timestamp": 1791997133.0,
+  "tool": "write_file"
+}

@@ -1,0 +1,13 @@
+{
+  "args_summary": "create_folder(path=res://data/characters)",
+  "files": [
+    {
+      "is_dir": true,
+      "kind": "created",
+      "path": "res://data/characters"
+    }
+  ],
+  "id": "000007",
+  "timestamp": 1791996893.0,
+  "tool": "create_folder"
+}

@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/player.tscn)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/player.tscn"
+    }
+  ],
+  "id": "000026",
+  "timestamp": 1791997072.0,
+  "tool": "write_file"
+}

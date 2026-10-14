@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/game/lata.gd" id="1_lata"]
+
+[sub_resource type="CylinderShape3D" id="shape_lata"]
+height = 0.4
+radius = 0.15
+
+[sub_resource type="CylinderMesh" id="mesh_lata"]
+top_radius = 0.15
+bottom_radius = 0.15
+height = 0.4
+radial_segments = 16
+
+[sub_resource type="StandardMaterial3D" id="mat_lata"]
+albedo_color = Color(0.9, 0.12, 0.2, 1)
+metallic = 0.3
+roughness = 0.5
+
+[node name="Lata" type="RigidBody3D"]
+mass = 0.4
+script = ExtResource("1_lata")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("shape_lata")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_lata")
+surface_material_override/0 = SubResource("mat_lata")

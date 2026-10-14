@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/arenas/sk_court.tscn)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/arenas/sk_court.tscn"
+    }
+  ],
+  "id": "000027",
+  "timestamp": 1791997118.0,
+  "tool": "write_file"
+}

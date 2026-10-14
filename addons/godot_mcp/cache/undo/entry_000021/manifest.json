@@ -1,0 +1,13 @@
+{
+  "args_summary": "configure_input_map",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000021/files/project.godot",
+      "kind": "snapshot",
+      "path": "res://project.godot"
+    }
+  ],
+  "id": "000021",
+  "timestamp": 1791996914.0,
+  "tool": "configure_input_map"
+}

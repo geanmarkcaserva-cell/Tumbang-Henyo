@@ -1,0 +1,13 @@
+{
+  "args_summary": "edit_script",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000069/files/scenes/game/lata.gd",
+      "kind": "snapshot",
+      "path": "res://scenes/game/lata.gd"
+    }
+  ],
+  "id": "000069",
+  "timestamp": 1792000071.0,
+  "tool": "edit_script"
+}

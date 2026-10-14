@@ -14,6 +14,7 @@ var _pending_reset := false
 
 func _ready() -> void:
 	_home = global_position
+	add_to_group("lata")
 
 
 func _physics_process(_delta: float) -> void:

@@ -1,0 +1,13 @@
+{
+  "args_summary": "batch_execute",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000066/files/scenes/arenas/sk_court.tscn",
+      "kind": "snapshot",
+      "path": "res://scenes/arenas/sk_court.tscn"
+    }
+  ],
+  "id": "000066",
+  "timestamp": 1791999794.0,
+  "tool": "batch_execute"
+}

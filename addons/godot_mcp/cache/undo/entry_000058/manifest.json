@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/wind_indicator.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/wind_indicator.gd"
+    }
+  ],
+  "id": "000058",
+  "timestamp": 1791999585.0,
+  "tool": "write_file"
+}

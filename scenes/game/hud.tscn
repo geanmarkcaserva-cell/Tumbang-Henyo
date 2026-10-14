@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scenes/game/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://scenes/game/quiz_panel.tscn" id="2_quiz"]
+[ext_resource type="Script" path="res://scenes/game/power_gauge.gd" id="3_gauge"]
+[ext_resource type="Script" path="res://scenes/game/wind_indicator.gd" id="4_wind"]
 
 [sub_resource type="StyleBoxFlat" id="style_awra_fill"]
 bg_color = Color(0.98, 0.42, 0.55, 1)
@@ -24,7 +26,7 @@ script = ExtResource("1_hud")
 offset_left = 32.0
 offset_top = 32.0
 offset_right = 1100.0
-offset_bottom = 260.0
+offset_bottom = 330.0
 mouse_filter = 2
 
 [node name="VBox" type="VBoxContainer" parent="Margin"]
@@ -59,10 +61,26 @@ theme_override_styles/fill = SubResource("style_stamina_fill")
 value = 100.0
 show_percentage = false
 
+[node name="WindRow" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="WindArrow" type="Control" parent="Margin/VBox/WindRow"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_wind")
+
+[node name="WindLabel" type="Label" parent="Margin/VBox/WindRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Wind: none"
+
 [node name="Hint" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
-text = "Quiz: click or 1/2/3   |   Run: WASD, Shift sprint, mouse look, Q look back   |   Esc free mouse"
+text = "Quiz: click or 1/2/3   |   Throw: mouse aim, hold click to charge, release   |   Run: WASD, Shift sprint, Q look back   |   Esc free mouse"
 
 [node name="RoundLabel" type="Label" parent="."]
 anchors_preset = 1
@@ -87,5 +105,42 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 10
 theme_override_font_sizes/font_size = 48
 horizontal_alignment = 1
+
+[node name="ThrowUI" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Crosshair" type="ColorRect" parent="ThrowUI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -5.0
+offset_top = -5.0
+offset_right = 5.0
+offset_bottom = 5.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.9)
+
+[node name="PowerGauge" type="Control" parent="ThrowUI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 140.0
+offset_top = -60.0
+offset_right = 260.0
+offset_bottom = 160.0
+mouse_filter = 2
+script = ExtResource("3_gauge")
 
 [node name="QuizPanel" parent="." instance=ExtResource("2_quiz")]

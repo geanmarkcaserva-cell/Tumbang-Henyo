@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/power_gauge.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/power_gauge.gd"
+    }
+  ],
+  "id": "000057",
+  "timestamp": 1791999584.0,
+  "tool": "write_file"
+}

@@ -1,0 +1,13 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/game.gd)",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000064/files/scenes/game/game.gd",
+      "kind": "snapshot",
+      "path": "res://scenes/game/game.gd"
+    }
+  ],
+  "id": "000064",
+  "timestamp": 1791999659.0,
+  "tool": "write_file"
+}

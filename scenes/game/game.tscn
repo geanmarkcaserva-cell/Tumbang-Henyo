@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://scenes/arenas/sk_court.tscn" id="2_arena"]
 [ext_resource type="PackedScene" path="res://scenes/game/player.tscn" id="3_player"]
 [ext_resource type="PackedScene" path="res://scenes/game/hud.tscn" id="4_hud"]
+[ext_resource type="Script" path="res://scenes/game/throw_controller.gd" id="5_throw"]
 
 [node name="Game" type="Node3D"]
 script = ExtResource("1_game")
@@ -12,5 +13,10 @@ script = ExtResource("1_game")
 
 [node name="Player" parent="." instance=ExtResource("3_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
+
+[node name="ThrowController" type="Node3D" parent="."]
+script = ExtResource("5_throw")
+
+[node name="Preview" type="MeshInstance3D" parent="ThrowController"]
 
 [node name="HUD" parent="." instance=ExtResource("4_hud")]

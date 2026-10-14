@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/throw_controller.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/throw_controller.gd"
+    }
+  ],
+  "id": "000055",
+  "timestamp": 1791999572.0,
+  "tool": "write_file"
+}

@@ -1,0 +1,13 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/tsinelas.tscn)",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000068/files/scenes/game/tsinelas.tscn",
+      "kind": "snapshot",
+      "path": "res://scenes/game/tsinelas.tscn"
+    }
+  ],
+  "id": "000068",
+  "timestamp": 1792000070.0,
+  "tool": "write_file"
+}

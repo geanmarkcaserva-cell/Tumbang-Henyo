@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/arenas/barangay.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/arenas/barangay.gd"
+    }
+  ],
+  "id": "000322",
+  "timestamp": 1792181494.0,
+  "tool": "write_file"
+}

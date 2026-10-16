@@ -1,14 +1,15 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://yhq0f4ujpntt"]
 
-[ext_resource type="Script" path="res://scenes/menus/main_menu.gd" id="1_menu"]
-[ext_resource type="PackedScene" path="res://scenes/arenas/sk_court.tscn" id="2_arena"]
+[ext_resource type="Script" uid="uid://lnpqhn6di1tl" path="res://scenes/menus/main_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" uid="uid://bmr6t7h0j7vth" path="res://scenes/arenas/sk_court.tscn" id="2_arena"]
 
-[node name="MainMenu" type="Node3D"]
+[node name="MainMenu" type="Node3D" unique_id=217436021]
 script = ExtResource("1_menu")
 
-[node name="Arena" parent="." instance=ExtResource("2_arena")]
+[node name="Arena" parent="." unique_id=1518721324 instance=ExtResource("2_arena")]
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1954604981]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 5.5, 2)
 current = true
 fov = 60.0
+far = 300.0

@@ -1,0 +1,13 @@
+{
+  "args_summary": "edit_script",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000286/files/tests/custom_quiz_test.gd",
+      "kind": "snapshot",
+      "path": "res://tests/custom_quiz_test.gd"
+    }
+  ],
+  "id": "000286",
+  "timestamp": 1792176364.0,
+  "tool": "edit_script"
+}

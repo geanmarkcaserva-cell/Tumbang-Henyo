@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bxxoxlqvxl5wn"]
+
+[ext_resource type="Script" uid="uid://dumbpab3wb801" path="res://tests/custom_quiz_test.gd" id="1_sefg5"]
+
+[node name="Node" type="Node" unique_id=133399152]
+script = ExtResource("1_sefg5")

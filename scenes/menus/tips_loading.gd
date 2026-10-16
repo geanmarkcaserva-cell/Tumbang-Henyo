@@ -12,7 +12,9 @@ const WINDOW := Color(0.55, 0.78, 1.0)
 
 const GAMEPLAY_TIPS := [
 	"Juke the taya: cut hard the other way and it keeps running where it thought you'd go.",
-	"Dash through a red ring. Tsinelas can't hit you mid-dash.",
+	"Tayas run faster than you walk but slower than you sprint. Save your Energy for the escape.",
+	"A red ring means a tsinelas is coming fast. Get out of it right away.",
+	"Jump while running for a burst of speed. Chain jumps to go even faster, if you have the Energy.",
 	"Sidestep a lunge at the last moment and the taya stumbles. That's your chance.",
 	"Answer fast: quicker answers score more points.",
 	"A taya with no tsinelas left has to stop and pick one up.",
@@ -42,11 +44,11 @@ func _process(delta: float) -> void:
 
 	if status == ResourceLoader.THREAD_LOAD_LOADED and _time >= min_time:
 		set_process(false)
-		get_tree().change_scene_to_packed(ResourceLoader.load_threaded_get(GameManager.GAME))
+		Transition.change_scene(ResourceLoader.load_threaded_get(GameManager.GAME))
 	elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
 		set_process(false)
 		push_error("Tips loading: could not load the game scene")
-		get_tree().change_scene_to_file(GameManager.GAME)
+		Transition.change_scene(GameManager.GAME)
 
 
 func _build_sky() -> void:

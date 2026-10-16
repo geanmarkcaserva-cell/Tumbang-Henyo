@@ -57,11 +57,11 @@ func _process(delta: float) -> void:
 
 	if status == ResourceLoader.THREAD_LOAD_LOADED and _time >= min_time:
 		set_process(false)
-		get_tree().change_scene_to_packed(ResourceLoader.load_threaded_get(GameManager.MAIN_MENU))
+		Transition.change_scene(ResourceLoader.load_threaded_get(GameManager.MAIN_MENU))
 	elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
 		set_process(false)
 		push_error("Boot loading: could not load the main menu")
-		get_tree().change_scene_to_file(GameManager.MAIN_MENU)
+		Transition.change_scene(GameManager.MAIN_MENU)
 
 
 ## Placeholder mascot: a white tsinelas with a black strap and grey toes.

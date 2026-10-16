@@ -25,6 +25,11 @@ func get_themes() -> Array:
 	return _by_theme.keys()
 
 
+## Custom mode: replace the questions of a player-made set (see CustomQuiz).
+func set_custom_questions(theme: String, questions: Array) -> void:
+	_by_theme[theme] = questions
+
+
 ## A random fact for the loading screen, taken from a question's explanation.
 func random_tip(theme: String) -> String:
 	var pool: Array = _by_theme.get(theme, []).filter(func(q): return q.explanation != "")

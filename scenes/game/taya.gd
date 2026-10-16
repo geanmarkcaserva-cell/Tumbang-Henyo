@@ -34,8 +34,10 @@ const ELITE_PALETTE := {"hair": Color(0.1, 0.08, 0.07), "skin": Color(0.72, 0.5,
 ## three at once in a fan.
 @export var elite := false
 
-@export var chase_speed := 6.4
-@export var reset_run_speed := 6.0
+## Same for every taya, elite included: a bit faster than the player's walk,
+## slower than their sprint (the round controller sets it from the player).
+@export var chase_speed := 5.5
+@export var reset_run_speed := 5.5
 @export var reset_time := 3.0 ## seconds spent standing the lata back up
 @export var tag_distance := 0.8
 
@@ -53,7 +55,10 @@ const ELITE_PALETTE := {"hair": Color(0.1, 0.08, 0.07), "skin": Color(0.72, 0.5,
 @export_group("Throwing")
 @export var throw_min_range := 4.0
 @export var throw_max_range := 11.0
-@export var wind_up_time := 0.6
+@export var wind_up_time := 0.45 ## warning ring shows this long before the throw
+@export var throw_speed := 22.0 ## metres per second along the throw (was 12)
+@export var min_flight_time := 0.28
+@export var max_flight_time := 0.55
 @export var throw_cooldown := 2.2
 @export var max_slippers := 2
 @export var lead_factor := 0.4 ## how much it aims ahead of a moving player (1 = perfect)
@@ -205,10 +210,7 @@ func _true_distance() -> float:
 	return _flat(_player.global_position - global_position).length()
 
 
-## Close enough to tag, and the player isn't mid-dash.
 func _can_tag(reach: float) -> bool:
-	if _player.has_method("is_dashing") and _player.is_dashing():
-		return false
 	return _true_distance() <= reach
 
 
@@ -312,7 +314,7 @@ func _start_wind_up(distance: float) -> void:
 	state = State.WIND_UP
 	_timer = wind_up_time
 	# Aim a bit ahead of where it last saw you heading, with some scatter.
-	var flight_time := clampf(distance / 12.0, 0.5, 1.0)
+	var flight_time := _flight_time(distance)
 	var lead := _seen_vel * (wind_up_time + flight_time) * lead_factor
 	var scatter := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).limit_length(1.0) * aim_error
 	_throw_target = _seen_pos + lead + scatter + Vector3(0.0, 0.03, 0.0)
@@ -322,7 +324,7 @@ func _start_wind_up(distance: float) -> void:
 
 func _throw() -> void:
 	var origin := global_transform * Vector3(0.35, 1.45, -0.35)
-	var flight_time := clampf(origin.distance_to(_throw_target) / 12.0, 0.5, 1.0)
+	var flight_time := _flight_time(origin.distance_to(_throw_target))
 	if elite:
 		# Fan of up to three: centre, left and right of the ring.
 		var side := _flat(_throw_target - origin).cross(Vector3.UP).normalized() * ELITE_FAN_SPREAD
@@ -350,6 +352,11 @@ func _spawn_slipper(origin: Vector3, target: Vector3, flight_time: float) -> voi
 	slipper.hit_target.connect(func(_body): hit_player.emit())
 	slipper.launch(velocity_out, Vector3.ZERO)
 	_thrown.append(slipper)
+
+
+## Fast, flat throws: less time to react once the tsinelas leaves the hand.
+func _flight_time(distance: float) -> float:
+	return clampf(distance / throw_speed, min_flight_time, max_flight_time)
 
 
 ## How many tayas are winding up a throw right now.

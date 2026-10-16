@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scripts/custom_quiz.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scripts/custom_quiz.gd"
+    }
+  ],
+  "id": "000281",
+  "timestamp": 1792176316.0,
+  "tool": "write_file"
+}

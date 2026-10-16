@@ -14,6 +14,15 @@ const CHARACTERS := [
 		"desc": "Batang kalye ng barangay. Sando, shorts, at walang takot sa taya.",
 		"palette": {"hair": Color(0.32, 0.2, 0.15), "skin": Color(0.86, 0.66, 0.52), "shirt": Color(0.36, 0.12, 0.15),
 			"accent": Color(0.98, 0.6, 0.62), "pants": Color(0.25, 0.05, 0.12), "feet": Color(0.25, 0.4, 0.92)}},
+	## Hand-drawn character: "sprite" names its folder. Every character uses the
+	## same three sheets there (see PixelArt.character_look): <id>_idle.png,
+	## <id>_run.png (back view) and <id>_happy.png, each a horizontal strip of
+	## square frames. The palette is only a fallback.
+	{"id": "gm", "name": "GM", "price": 0,
+		"desc": "Ang henyo ng barangay. Laging may sagot, laging may ahoge.",
+		"palette": {"hair": Color(0.05, 0.05, 0.06), "skin": Color(0.98, 0.84, 0.72), "shirt": Color(0.08, 0.1, 0.2),
+			"accent": Color(0.85, 0.15, 0.15), "pants": Color(0.08, 0.1, 0.2), "feet": Color(0.05, 0.05, 0.08)},
+		"sprite": {"dir": "res://art/characters/gm", "pixel_size": 0.095}},
 	{"id": "neneng", "name": "Neneng", "price": 150,
 		"desc": "Laging naka-uniform galing eskwela. Mabilis tumakbo, mas mabilis sumagot.",
 		"palette": {"hair": Color(0.1, 0.08, 0.08), "skin": Color(0.88, 0.7, 0.56), "shirt": Color(0.95, 0.95, 0.95),
@@ -65,7 +74,14 @@ func _ready() -> void:
 
 
 func owns(item_id: String) -> bool:
-	return owned.has(item_id)
+	if owned.has(item_id):
+		return true
+	# Free items are always yours (also on saves made before they existed).
+	for kind in ["character", "slipper"]:
+		for item in catalog(kind):
+			if item.id == item_id and item.price == 0:
+				return true
+	return false
 
 
 func can_afford(price: int) -> bool:

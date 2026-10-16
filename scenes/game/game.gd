@@ -20,7 +20,12 @@ const CAPS_CORRECT := 2 ## tansan per correct answer (GDD: Economy and shop)
 const CAPS_ROUND_CLEAR := 10
 const SLIPPER_STAGGER_TIME := 0.5
 const SLIPPER_KNOCKBACK := 4.0
+## Every taya (elite too) runs at this multiple of the player's walk speed:
+## walking, they slowly catch you; sprinting (energy), you pull away.
+const TAYA_SPEED_RATIO := 1.1
 const MISS_GRACE_TIME := 0.6 ## the lata may still be toppling after the tsinelas stops
+const CELEBRATE_CORRECT := 0.9 ## seconds of the happy sheet after a right answer
+const FADE_TIME := 0.45 ## fade to black / back between rounds
 
 ## Scoring (GDD): answer points 100 + 10 per second left (max 250), 100 per
 ## hit, 200 for clearing the round, all multiplied by 1 + 0.1 x (round - 1).
@@ -69,7 +74,6 @@ func _ready() -> void:
 	_lata_home = _lata.global_position
 	_player.respawn(_spawn.global_position)
 	_player.stamina_changed.connect(_hud.set_stamina)
-	_player.dash_changed.connect(_hud.set_dash)
 	_lata.knocked_down.connect(_on_lata_knocked_down)
 	_finish.body_entered.connect(_on_finish_body_entered)
 	_quiz.answered.connect(_on_quiz_answered)
@@ -79,7 +83,7 @@ func _ready() -> void:
 	_throw.settled.connect(_on_tsinelas_settled)
 	_hud.pause_requested.connect(_on_pause_requested)
 	_hud.resume_pressed.connect(_resume)
-	_hud.play_again_pressed.connect(func(): get_tree().reload_current_scene())
+	_hud.play_again_pressed.connect(func(): Transition.reload())
 	_hud.main_menu_pressed.connect(_quit_to_menu)
 	Economy.caps_changed.connect(_hud.set_caps)
 
@@ -109,7 +113,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_throw_missed()
 		State.GAME_OVER:
 			if event.is_action_pressed("restart"):
-				get_tree().reload_current_scene()
+				Transition.reload()
 
 
 # --- Difficulty by round (GDD: Difficulty by round) ------------------------
@@ -132,16 +136,6 @@ func _preview_for_round() -> float:
 	elif round_number <= 9:
 		return 0.25
 	return 0.0
-
-
-func _taya_speed_ratio() -> float: ## taya speed vs the player's sprint
-	if round_number <= 2:
-		return 0.8
-	elif round_number <= 5:
-		return 0.88
-	elif round_number <= 9:
-		return 0.95
-	return 1.0
 
 
 func _taya_reaction_time() -> float: ## seconds between the taya's looks at you
@@ -266,9 +260,14 @@ func _on_quiz_answered(choice_index: int) -> void:
 		_round_points += points
 		_add_caps(CAPS_CORRECT)
 		_hud.show_status("+%d" % points)
-		await get_tree().create_timer(0.8).timeout
+		await _wait(0.8)
+		if state != State.QUIZ:
+			return
+		# Panel away, then a quick happy turn to the camera before the throw.
+		_quiz.close()
+		_player.celebrate(CELEBRATE_CORRECT)
+		await _wait(CELEBRATE_CORRECT)
 		if state == State.QUIZ:
-			_quiz.close()
 			_enter_throw()
 	else:
 		_answer_failed()
@@ -287,7 +286,7 @@ func _answer_failed() -> void:
 	if state == State.GAME_OVER:
 		return
 	# Leave the explanation up long enough to read.
-	await get_tree().create_timer(2.5).timeout
+	await _wait(2.5)
 	if state == State.QUIZ:
 		_quiz.close()
 		_enter_quiz()
@@ -318,7 +317,7 @@ func _on_thrown() -> void:
 func _on_tsinelas_settled() -> void:
 	if state != State.THROW:
 		return
-	await get_tree().create_timer(MISS_GRACE_TIME).timeout
+	await _wait(MISS_GRACE_TIME)
 	if state == State.THROW:
 		_on_throw_missed()
 
@@ -339,9 +338,10 @@ func _on_throw_missed() -> void:
 	if state == State.GAME_OVER:
 		return
 	_hud.show_status("Sablay! Missed the lata.")
-	await get_tree().create_timer(1.2).timeout
+	_player.controls_enabled = false
+	await _wait(1.2)
 	if state == State.THROW:
-		_enter_quiz()
+		_next_attempt()
 
 
 func _on_lata_knocked_down() -> void:
@@ -361,7 +361,7 @@ func _enter_run() -> void:
 	var who := "the taya" if _tayas.size() == 1 else "a taya"
 	_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
 	for t in _tayas:
-		t.configure(_player.sprint_speed * _taya_speed_ratio(), _lata_reset_time(),
+		t.configure(_player.walk_speed * TAYA_SPEED_RATIO, _lata_reset_time(),
 				_taya_reaction_time(), _taya_aim_error())
 	# The nearest taya stands the lata up; the rest wait, then everyone chases.
 	_nearest_taya_to_lata().start_reset()
@@ -376,7 +376,7 @@ func _on_taya_lata_reset() -> void:
 
 
 func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
-	if state != State.RUN or _player.is_dashing():
+	if state != State.RUN:
 		return
 	_lose_awra(AWRA_SLIPPER_HIT)
 	if state == State.GAME_OVER:
@@ -397,10 +397,9 @@ func _on_tagged() -> void:
 	if state == State.GAME_OVER:
 		return
 	_hud.show_status("Taya ka! -%d Awra" % AWRA_TAGGED)
-	await get_tree().create_timer(1.8).timeout
+	await _wait(1.8)
 	if state == State.TAGGED:
-		_reset_field()
-		_enter_quiz()
+		_next_attempt()
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
@@ -414,6 +413,7 @@ func _round_clear() -> void:
 	_set_state(State.ROUND_CLEAR)
 	_set_player_mode(false, false)
 	_stop_tayas()
+	_player.celebrate(-1.0) # until the next round respawns them
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	awra = mini(awra + AWRA_ROUND_CLEAR, MAX_AWRA)
 	_hud.set_awra(awra, MAX_AWRA)
@@ -424,17 +424,39 @@ func _round_clear() -> void:
 	_add_caps(CAPS_ROUND_CLEAR)
 	Economy.save_profile()
 	_hud.show_status("Round %d clear!  +%d points  +%d Awra  +%d tansan" % [round_number, gained, AWRA_ROUND_CLEAR, CAPS_ROUND_CLEAR])
-	await get_tree().create_timer(2.2).timeout
+	await _wait(2.2)
+	if state != State.ROUND_CLEAR:
+		return
+	# Fade to black, reset everything out of sight, fade back in on the new question.
+	await _hud.fade_out(FADE_TIME)
 	if state != State.ROUND_CLEAR:
 		return
 	round_number += 1
 	_hud.set_round(round_number)
+	_hud.show_status("")
 	_reset_field()
 	var joined := _ensure_tayas()
 	_enter_quiz()
 	if joined > 0:
 		var elite_joined: bool = _tayas.back().elite
 		_hud.show_status("Round %d: %s" % [round_number, "an ELITE taya joins! (3 tsinelas)" if elite_joined else "another taya joins!"])
+	await _wait(0.15) # one beat of black so the jump isn't visible
+	_hud.fade_in(FADE_TIME)
+
+
+## After a miss or a tag: fade to black, everyone back to their spots, and
+## fade in on the next question.
+func _next_attempt() -> void:
+	var from_state := state
+	await _hud.fade_out(FADE_TIME)
+	if state != from_state: # game over or quit meanwhile
+		_hud.fade_in(FADE_TIME)
+		return
+	_hud.show_status("")
+	_reset_field()
+	_enter_quiz()
+	await _wait(0.15)
+	_hud.fade_in(FADE_TIME)
 
 
 ## Everyone back to their starting spots for the next attempt.
@@ -506,6 +528,11 @@ func _set_player_mode(move: bool, look: bool) -> void:
 		_player.set_aim_mode(false)
 		_player.set_move_bounds(Rect2())
 		_player.sprint_enabled = true
+
+
+## Like create_timer, but stops counting while the game is paused.
+func _wait(seconds: float) -> Signal:
+	return get_tree().create_timer(seconds, false).timeout
 
 
 func _set_state(new_state: State) -> void:

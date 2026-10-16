@@ -1,5 +1,5 @@
 extends CanvasLayer
-## Greybox HUD: Awra, stamina, dash, round, score, tansan, status text, the
+## Greybox HUD: Awra, energy, round, score, tansan, status text, the
 ## quiz panel, the throw UI (power gauge, crosshair, wind), plus the pause
 ## menu and the game over panel.
 ##
@@ -15,8 +15,6 @@ signal main_menu_pressed
 @onready var _awra_bar: ProgressBar = $Margin/VBox/AwraBar
 @onready var _awra_label: Label = $Margin/VBox/AwraLabel
 @onready var _stamina_bar: ProgressBar = $Margin/VBox/StaminaBar
-@onready var _dash_bar: ProgressBar = $Margin/VBox/DashBar
-@onready var _dash_label: Label = $Margin/VBox/DashLabel
 @onready var _round_label: Label = $RoundLabel
 @onready var _status: Label = $Status
 @onready var _throw_ui: Control = $ThrowUI
@@ -29,16 +27,43 @@ var _caps_label: Label
 var _pause_panel: Control
 var _over_panel: Control
 var _over_text: Label
+var _fade: ColorRect
+var _fade_tween: Tween
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	quiz.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_throw_ui.visible = false
-	$Margin/VBox/Hint.text = "Quiz: click or 1/2/3   |   Throw: mouse aim, hold click to charge, release   |   Run: WASD, Shift sprint, Space dash, Q look back   |   Esc pause"
+	$Margin/VBox/Hint.text = "Quiz: click or 1/2/3   |   Throw: mouse aim, hold click to charge, release   |   Run: WASD, hold Shift to sprint (uses Energy), Space jump, Q look back   |   Esc pause"
+	$Margin/VBox/StaminaLabel.text = "Energy"
 	_build_score_labels()
 	_pause_panel = _build_pause_panel()
 	_over_panel = _build_game_over_panel()
+	_fade = ColorRect.new()
+	_fade.color = Color(0, 0, 0, 0)
+	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade.z_index = 40 # over the game and quiz, under pause / game over (50)
+	add_child(_fade)
+
+
+## Fade the screen to black. await it to know when it's fully black.
+func fade_out(seconds: float = 0.45) -> Signal:
+	return _fade_to(1.0, seconds)
+
+
+## Fade back from black.
+func fade_in(seconds: float = 0.45) -> Signal:
+	return _fade_to(0.0, seconds)
+
+
+func _fade_to(alpha: float, seconds: float) -> Signal:
+	if _fade_tween:
+		_fade_tween.kill()
+	_fade_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_STOP) # freezes while paused
+	_fade_tween.tween_property(_fade, "color:a", alpha, seconds).set_trans(Tween.TRANS_SINE)
+	return _fade_tween.finished
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -56,11 +81,6 @@ func set_awra(value: int, max_value: int) -> void:
 func set_stamina(value: float, max_value: float) -> void:
 	_stamina_bar.max_value = max_value
 	_stamina_bar.value = value
-
-
-func set_dash(ready_fraction: float) -> void:
-	_dash_bar.value = ready_fraction
-	_dash_label.text = "Dash  READY" if ready_fraction >= 1.0 else "Dash"
 
 
 func set_round(number: int) -> void:

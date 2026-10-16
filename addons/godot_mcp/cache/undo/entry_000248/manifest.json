@@ -1,0 +1,13 @@
+{
+  "args_summary": "edit_script",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000248/files/scenes/menus/main_menu.gd",
+      "kind": "snapshot",
+      "path": "res://scenes/menus/main_menu.gd"
+    }
+  ],
+  "id": "000248",
+  "timestamp": 1792174533.0,
+  "tool": "edit_script"
+}

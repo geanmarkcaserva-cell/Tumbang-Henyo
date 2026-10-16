@@ -1,41 +1,45 @@
 extends CharacterBody3D
-## Greybox player: behind-the-back camera, WASD movement, sprint with stamina,
-## and a short dash. The round controller turns controls on for the run and
-## off for the quiz.
+## Player: behind-the-back camera, WASD movement, and sprint powered by the
+## energy (stamina) bar. Sprinting is the player's edge over the tayas: they
+## run a little faster than your walk but slower than your sprint, so spend
+## energy wisely. The round controller turns controls on for the run and off
+## for the quiz.
 
 signal stamina_changed(value: float, max_value: float)
-signal dash_changed(ready_fraction: float) ## 1 = ready, 0 = just used
 
 @export var walk_speed := 5.0
 @export var sprint_speed := 8.0
 @export var acceleration := 30.0
 @export var mouse_sensitivity := 0.003
-@export var max_stamina := 100.0
-@export var stamina_drain := 18.0 ## per second while sprinting (about 5.5 s of full sprint)
+@export var max_stamina := 50.0 ## halved from 100: Energy is the player's only edge, so spend it carefully
+@export var stamina_drain := 18.0 ## per second while sprinting (about 2.8 s of full sprint)
 @export var stamina_regen := 15.0 ## per second while not sprinting
+@export var recover_at := 0.3 ## after running dry, sprint unlocks again at this fraction
 @export var min_pitch_deg := -45.0
 @export var max_pitch_deg := 15.0
 @export var walk_fov := 70.0
-@export var sprint_fov := 78.0
+@export var sprint_fov := 80.0
 
-@export_group("Dash")
-@export var dash_speed := 17.0
-@export var dash_time := 0.18 ## seconds (about 3 m)
-@export var dash_cooldown := 1.5
-@export var dash_stamina_cost := 15.0 ## taken if available; dashing never needs stamina
-@export var dash_fov := 86.0
+@export_group("Jump")
+@export var jump_velocity := 5.0 ## about 1.2 m high
+@export var jump_boost := 1.6 ## m/s added in the direction you're moving, per jump
+@export var max_air_speed := 10.5 ## cap for chained (bunny-hop) jumps
+@export var air_control := 0.35 ## steering in the air vs on the ground
+@export var fall_gravity_mult := 1.5 ## falls faster than it rises: snappier jumps
+@export var jump_energy_cost := 5.0 ## per boosted jump; no energy = jump without boost
+@export var coyote_time := 0.12 ## can still jump just after running off an edge
+@export var jump_buffer_time := 0.12 ## a press just before landing still jumps
 
 var controls_enabled := true ## movement and sprint
 var look_enabled := true ## mouse look
-var sprint_enabled := true ## also gates the dash (off while throwing)
-var stamina := 100.0
+var sprint_enabled := true ## off while throwing
+var stamina := 50.0
 var _bounds := Rect2() ## x/z area the player must stay inside (empty = no limit)
 var _stagger_time := 0.0
-var _dash_time_left := 0.0
-var _dash_cd := 0.0
-var _dash_dir := Vector3.ZERO
 var _camera_tween: Tween
 var _exhausted := false
+var _coyote := 0.0
+var _jump_buffer := 0.0
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 @onready var _pivot: Node3D = $CameraPivot
@@ -49,19 +53,23 @@ func _ready() -> void:
 	_spring.add_excluded_object(get_rid())
 	add_to_group("player")
 	# Paper-cutout sprite of the character picked in Select character.
-	var palette: Dictionary = Economy.find_item("character", Economy.equipped_character).palette
-	$PaperDoll.set_textures(PixelArt.character(palette), PixelArt.character_back(palette))
+	$PaperDoll.set_look(PixelArt.character_look(Economy.find_item("character", Economy.equipped_character)))
 
 
-## True during the dash burst: tags and tsinelas hits don't count.
-func is_dashing() -> bool:
-	return _dash_time_left > 0.0
+## Flip the cutout to the camera and play the happy sheet.
+## duration < 0 keeps it up until respawn().
+func celebrate(duration: float = 1.2) -> void:
+	$PaperDoll.play_happy(duration)
+
+
+## Out of energy: sprint is locked until the bar refills to `recover_at`.
+func is_exhausted() -> bool:
+	return _exhausted
 
 
 ## Knocked off balance (hit by a tsinelas): no control for a moment, pushed back.
 func stagger(duration: float, push: Vector3) -> void:
 	_stagger_time = duration
-	_dash_time_left = 0.0
 	velocity.x = push.x
 	velocity.z = push.z
 
@@ -71,14 +79,15 @@ func respawn(at: Vector3) -> void:
 	global_position = at
 	velocity = Vector3.ZERO
 	_stagger_time = 0.0
-	_dash_time_left = 0.0
-	_dash_cd = 0.0
+	_jump_buffer = 0.0
+	$PaperDoll.stop_happy()
 	rotation = Vector3.ZERO
 	_pivot.rotation = Vector3(_default_pitch, 0.0, 0.0)
 
 
 ## Over-the-shoulder aim camera for the throw (closer and more to the right).
 func set_aim_mode(on: bool) -> void:
+	$PaperDoll.set_see_through(on) # big-haired characters would block the aim
 	if _camera_tween:
 		_camera_tween.kill()
 	_camera_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
@@ -117,8 +126,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not is_on_floor():
-		velocity.y -= _gravity * delta
+	var on_floor := is_on_floor()
+	if not on_floor:
+		var g := _gravity * (fall_gravity_mult if velocity.y < 0.0 else 1.0)
+		velocity.y -= g * delta
 
 	var staggered := _stagger_time > 0.0
 	if staggered:
@@ -128,60 +139,71 @@ func _physics_process(delta: float) -> void:
 		input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var dir := transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)
 
-	# --- Dash ---
-	_dash_cd = maxf(_dash_cd - delta, 0.0)
-	var can_dash := controls_enabled and sprint_enabled and not staggered and _dash_cd <= 0.0
-	if can_dash and Input.is_action_just_pressed("dash"):
-		# Dash the way you're steering, or straight ahead if you're not.
-		_dash_dir = dir.normalized() if dir.length() > 0.1 else -transform.basis.z
-		_dash_time_left = dash_time
-		_dash_cd = dash_cooldown
-		stamina = maxf(stamina - dash_stamina_cost, 0.0)
-	var dashing := _dash_time_left > 0.0
-	if dashing:
-		_dash_time_left -= delta
-		if _dash_time_left <= 0.0:
-			# Dash over: drop back to sprint speed instead of sliding on.
-			var flat := Vector2(velocity.x, velocity.z).limit_length(sprint_speed)
-			velocity.x = flat.x
-			velocity.z = flat.y
-			dashing = false
+	# --- Jump (with coyote time and a press buffer) ---
+	_coyote = coyote_time if on_floor else _coyote - delta
+	_jump_buffer -= delta
+	if controls_enabled and not staggered and Input.is_action_just_pressed("jump"):
+		_jump_buffer = jump_buffer_time
+	var jumped := false
+	if _jump_buffer > 0.0 and _coyote > 0.0:
+		_jump(dir)
+		jumped = true
+	var airborne := jumped or not on_floor
 
-	# --- Sprint and stamina ---
+	# --- Sprint (energy) ---
 	var sprinting := controls_enabled and sprint_enabled and Input.is_action_pressed("sprint") \
 			and input_dir.length() > 0.1 and not _exhausted
 	if sprinting:
 		stamina = maxf(stamina - stamina_drain * delta, 0.0)
 		if stamina <= 0.0:
 			_exhausted = true
-	elif not dashing:
+	else:
 		stamina = minf(stamina + stamina_regen * delta, max_stamina)
-		if _exhausted and stamina >= max_stamina * 0.3:
+		if _exhausted and stamina >= max_stamina * recover_at:
 			_exhausted = false
 
 	# --- Move ---
-	if dashing:
-		velocity.x = _dash_dir.x * dash_speed
-		velocity.z = _dash_dir.z * dash_speed
-	else:
-		var speed := sprint_speed if sprinting else walk_speed
-		var accel := acceleration * (0.25 if staggered else 1.0) # a stagger slides you a little
-		velocity.x = move_toward(velocity.x, dir.x * speed, accel * delta)
-		velocity.z = move_toward(velocity.z, dir.z * speed, accel * delta)
+	var speed := sprint_speed if sprinting else walk_speed
+	var accel := acceleration * (0.25 if staggered else 1.0) # a stagger slides you a little
+	if airborne:
+		# Keep the jump's momentum: steer weakly, never brake below current speed.
+		speed = maxf(speed, Vector2(velocity.x, velocity.z).length())
+		accel *= air_control
+	velocity.x = move_toward(velocity.x, dir.x * speed, accel * delta)
+	velocity.z = move_toward(velocity.z, dir.z * speed, accel * delta)
 	move_and_slide()
 	_apply_bounds()
 
 	stamina_changed.emit(stamina, max_stamina)
-	dash_changed.emit(1.0 - _dash_cd / dash_cooldown)
 
 	# Hold look_back to swing the camera around and see who's chasing you.
 	# (Not while aiming a throw, or the aim would point backwards.)
 	var looking_back := controls_enabled and not _bounds.has_area() and Input.is_action_pressed("look_back")
 	_pivot.rotation.y = lerp_angle(_pivot.rotation.y, PI if looking_back else 0.0, 12.0 * delta)
 
-	# Field-of-view kick while sprinting, bigger while dashing.
-	var target_fov := dash_fov if dashing else (sprint_fov if sprinting else walk_fov)
-	_camera.fov = lerpf(_camera.fov, target_fov, 10.0 * delta)
+	# Field-of-view kick while sprinting.
+	_camera.fov = lerpf(_camera.fov, sprint_fov if sprinting else walk_fov, 10.0 * delta)
+
+
+## Jump up, plus a little speed the way you're steering (or already moving).
+## The boost costs energy and is only given while running (not while aiming
+## a throw); chained jumps keep adding up to max_air_speed.
+func _jump(dir: Vector3) -> void:
+	velocity.y = jump_velocity
+	_jump_buffer = 0.0
+	_coyote = 0.0
+	if not sprint_enabled or _exhausted or stamina < jump_energy_cost:
+		return
+	var flat := Vector2(velocity.x, velocity.z)
+	var push := Vector2(dir.x, dir.z)
+	if push.length() < 0.1:
+		push = flat # no input: boost along the current motion
+	if push.length() < 0.1:
+		return # standing still: straight up
+	flat = (flat + push.normalized() * jump_boost).limit_length(max_air_speed)
+	velocity.x = flat.x
+	velocity.z = flat.y
+	stamina = maxf(stamina - jump_energy_cost, 0.0)
 
 
 func _apply_bounds() -> void:

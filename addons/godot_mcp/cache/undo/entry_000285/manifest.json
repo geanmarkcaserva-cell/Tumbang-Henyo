@@ -1,0 +1,12 @@
+{
+  "args_summary": "create_scene(scene_path=res://tests/custom_quiz_test.tscn)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://tests/custom_quiz_test.tscn"
+    }
+  ],
+  "id": "000285",
+  "timestamp": 1792176349.0,
+  "tool": "create_scene"
+}

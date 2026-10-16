@@ -1,0 +1,13 @@
+{
+  "args_summary": "add_node(scene_path=res://scenes/arenas/sk_court.tscn, node_name=StandColliders, node_type=StaticBody3D)",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000123/files/scenes/arenas/sk_court.tscn",
+      "kind": "snapshot",
+      "path": "res://scenes/arenas/sk_court.tscn"
+    }
+  ],
+  "id": "000123",
+  "timestamp": 1792159181.0,
+  "tool": "add_node"
+}

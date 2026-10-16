@@ -1,0 +1,13 @@
+{
+  "args_summary": "edit_script",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000162/files/scenes/game/throw_controller.gd",
+      "kind": "snapshot",
+      "path": "res://scenes/game/throw_controller.gd"
+    }
+  ],
+  "id": "000162",
+  "timestamp": 1792160130.0,
+  "tool": "edit_script"
+}

@@ -1,10 +1,14 @@
 extends Node3D
 ## Round controller: Quiz -> Throw -> Run -> Round clear, with Awra loss
-## on a wrong answer or a miss, and game over at 0 Awra.
+## on a wrong answer, a miss, a tsinelas hit or a tag, and game over at 0 Awra.
+## Also keeps score (GDD: Scoring), runs the taya squad (1-5 tayas, elites),
+## the pause menu and the game over panel.
 ##
 ## Debug keys in the Throw state: H = force a hit, M = force a miss.
 
 enum State { QUIZ, THROW, RUN, ROUND_CLEAR, GAME_OVER, TAGGED }
+
+const TAYA_SCENE := preload("res://scenes/game/taya.tscn")
 
 const MAX_AWRA := 100
 const AWRA_WRONG := 20
@@ -12,34 +16,57 @@ const AWRA_MISS := 15
 const AWRA_TAGGED := 25
 const AWRA_SLIPPER_HIT := 10
 const AWRA_ROUND_CLEAR := 10
+const CAPS_CORRECT := 2 ## tansan per correct answer (GDD: Economy and shop)
+const CAPS_ROUND_CLEAR := 10
 const SLIPPER_STAGGER_TIME := 0.5
 const SLIPPER_KNOCKBACK := 4.0
 const MISS_GRACE_TIME := 0.6 ## the lata may still be toppling after the tsinelas stops
-## Where the player may walk while throwing: behind the throw line (z = 0),
-## inside the court sides. Rect2(min x, min z, width, depth).
-const THROW_ZONE := Rect2(-8.6, 0.4, 17.2, 6.6)
 
-@export var theme_id := "kasaysayan"
+## Scoring (GDD): answer points 100 + 10 per second left (max 250), 100 per
+## hit, 200 for clearing the round, all multiplied by 1 + 0.1 x (round - 1).
+const POINTS_ANSWER_BASE := 100
+const POINTS_PER_SECOND := 10
+const POINTS_ANSWER_MAX := 250
+const POINTS_HIT := 100
+const POINTS_ROUND_CLEAR := 200
+
+## Where the player may walk while throwing: behind the throw line (z = -6),
+## inside the court sides, and in front of the near hoop's pole (z = +2.76).
+## Rect2(min x, min z, width, depth).
+const THROW_ZONE := Rect2(-8.6, -5.6, 17.2, 3.6)
+
+## Guard spots for extra tayas, as offsets from the lata.
+const TAYA_SPOTS := [Vector3(-1.6, 0, -1.2), Vector3(2.6, 0, 1.6), Vector3(-2.6, 0, 1.6), Vector3(0.0, 0, -2.8)]
+
+var theme_id := "history" ## set from GameManager.selected_theme on start
 
 var state: State = State.QUIZ
 var awra := MAX_AWRA
 var round_number := 1
+var score := 0
 
 var _question: Dictionary = {}
 var _correct_index := 0
 var _wind := Vector3.ZERO
+var _round_points := 0
+var _run_caps := 0
+var _tayas: Array = []
+var _lata_home := Vector3.ZERO
 
 @onready var _player: CharacterBody3D = $Player
 @onready var _hud: CanvasLayer = $HUD
 @onready var _quiz: Control = $HUD/QuizPanel
 @onready var _throw: Node3D = $ThrowController
+@onready var _arena: Node3D = $Arena
 @onready var _lata: RigidBody3D = $Arena/Lata
-@onready var _taya: CharacterBody3D = $Arena/Taya
 @onready var _finish: Area3D = $Arena/FinishLine
 @onready var _spawn: Marker3D = $Arena/PlayerSpawn
 
 
 func _ready() -> void:
+	get_tree().paused = false
+	theme_id = GameManager.selected_theme
+	_lata_home = _lata.global_position
 	_player.respawn(_spawn.global_position)
 	_player.stamina_changed.connect(_hud.set_stamina)
 	_player.dash_changed.connect(_hud.set_dash)
@@ -50,13 +77,20 @@ func _ready() -> void:
 	_throw.power_changed.connect(_hud.set_power)
 	_throw.thrown.connect(_on_thrown)
 	_throw.settled.connect(_on_tsinelas_settled)
-	_taya.setup(_player, _lata)
-	_taya.lata_reset.connect(_on_taya_lata_reset)
-	_taya.tagged_player.connect(_on_tagged)
-	_taya.hit_player.connect(_on_hit_by_slipper)
+	_hud.pause_requested.connect(_on_pause_requested)
+	_hud.resume_pressed.connect(_resume)
+	_hud.play_again_pressed.connect(func(): get_tree().reload_current_scene())
+	_hud.main_menu_pressed.connect(_quit_to_menu)
+	Economy.caps_changed.connect(_hud.set_caps)
+
+	_hook_taya($Arena/Taya)
+	_ensure_tayas()
+
 	QuizDatabase.reset_run()
 	_hud.set_awra(awra, MAX_AWRA)
 	_hud.set_round(round_number)
+	_hud.set_score(score)
+	_hud.set_caps(Economy.caps)
 	_hud.update_wind(Vector3.ZERO, _player.global_basis)
 	_enter_quiz()
 
@@ -140,12 +174,65 @@ func _lata_reset_time() -> float:
 	return 1.5
 
 
+## Which tayas play this round: one entry per taya, true = elite.
+func _taya_lineup() -> Array:
+	if round_number <= 2:
+		return [false]
+	elif round_number <= 5:
+		return [false, false]
+	elif round_number <= 9:
+		return [false, false, true]
+	elif round_number <= 12:
+		return [false, false, false, true]
+	return [false, false, false, true, true]
+
+
 func _roll_wind() -> Vector3:
 	var max_speed := _wind_max_for_round()
 	if max_speed <= 0.0:
 		return Vector3.ZERO
 	var angle := randf() * TAU
 	return Vector3(cos(angle), 0.0, sin(angle)) * randf_range(max_speed * 0.3, max_speed)
+
+
+# --- Taya squad -----------------------------------------------------------------
+
+## Spawn extra tayas until this round's lineup is on the court.
+## Returns how many joined.
+func _ensure_tayas() -> int:
+	var lineup := _taya_lineup()
+	var joined := 0
+	for i in range(_tayas.size(), lineup.size()):
+		var t: CharacterBody3D = TAYA_SCENE.instantiate()
+		t.elite = lineup[i]
+		t.position = _lata_home + TAYA_SPOTS[(i - 1) % TAYA_SPOTS.size()]
+		t.position.y = 0.0
+		t.name = "Taya%d" % (i + 1)
+		_arena.add_child(t)
+		_hook_taya(t)
+		joined += 1
+	return joined
+
+
+func _hook_taya(t: CharacterBody3D) -> void:
+	t.setup(_player, _lata)
+	t.lata_reset.connect(_on_taya_lata_reset)
+	t.tagged_player.connect(_on_tagged)
+	t.hit_player.connect(_on_hit_by_slipper.bind(t))
+	_tayas.append(t)
+
+
+func _nearest_taya_to_lata() -> CharacterBody3D:
+	var best: CharacterBody3D = _tayas[0]
+	for t in _tayas:
+		if t.global_position.distance_to(_lata.global_position) < best.global_position.distance_to(_lata.global_position):
+			best = t
+	return best
+
+
+func _stop_tayas() -> void:
+	for t in _tayas:
+		t.stop()
 
 
 # --- Quiz -------------------------------------------------------------
@@ -156,7 +243,6 @@ func _enter_quiz() -> void:
 	_throw.end()
 	_hud.show_throw_ui(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	_hud.show_status("")
 	_question = QuizDatabase.next_question(theme_id, "easy")
 	if _question.is_empty():
 		push_error("No questions found for theme '%s'" % theme_id)
@@ -176,6 +262,10 @@ func _on_quiz_answered(choice_index: int) -> void:
 		return
 	_quiz.show_result(choice_index, _correct_index, _question.explanation)
 	if choice_index == _correct_index:
+		var points := mini(POINTS_ANSWER_BASE + POINTS_PER_SECOND * int(_quiz.get_time_left()), POINTS_ANSWER_MAX)
+		_round_points += points
+		_add_caps(CAPS_CORRECT)
+		_hud.show_status("+%d" % points)
 		await get_tree().create_timer(0.8).timeout
 		if state == State.QUIZ:
 			_quiz.close()
@@ -192,6 +282,7 @@ func _on_quiz_timed_out() -> void:
 
 
 func _answer_failed() -> void:
+	_hud.show_status("")
 	_lose_awra(AWRA_WRONG)
 	if state == State.GAME_OVER:
 		return
@@ -255,6 +346,7 @@ func _on_throw_missed() -> void:
 
 func _on_lata_knocked_down() -> void:
 	if state == State.THROW:
+		_round_points += POINTS_HIT
 		_throw.end()
 		_enter_run()
 
@@ -266,24 +358,30 @@ func _enter_run() -> void:
 	_set_player_mode(true, true)
 	_hud.show_throw_ui(false)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_hud.show_status("Lata down! Run before the taya stands it back up!")
-	_taya.configure(_player.sprint_speed * _taya_speed_ratio(), _lata_reset_time(),
-			_taya_reaction_time(), _taya_aim_error())
-	_taya.start_reset()
+	var who := "the taya" if _tayas.size() == 1 else "a taya"
+	_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
+	for t in _tayas:
+		t.configure(_player.sprint_speed * _taya_speed_ratio(), _lata_reset_time(),
+				_taya_reaction_time(), _taya_aim_error())
+	# The nearest taya stands the lata up; the rest wait, then everyone chases.
+	_nearest_taya_to_lata().start_reset()
 
 
 func _on_taya_lata_reset() -> void:
-	if state == State.RUN:
-		_hud.show_status("Lata is up! Takbo, the taya is chasing you!")
+	if state != State.RUN:
+		return
+	for t in _tayas:
+		t.start_chase()
+	_hud.show_status("Lata is up! Takbo!")
 
 
-func _on_hit_by_slipper() -> void:
+func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
 	if state != State.RUN or _player.is_dashing():
 		return
 	_lose_awra(AWRA_SLIPPER_HIT)
 	if state == State.GAME_OVER:
 		return
-	var away := _player.global_position - _taya.global_position
+	var away := _player.global_position - from_taya.global_position
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
 	_hud.show_status("Aray! -%d Awra" % AWRA_SLIPPER_HIT)
@@ -294,6 +392,7 @@ func _on_tagged() -> void:
 		return
 	_set_state(State.TAGGED)
 	_set_player_mode(false, false)
+	_stop_tayas()
 	_lose_awra(AWRA_TAGGED)
 	if state == State.GAME_OVER:
 		return
@@ -314,16 +413,28 @@ func _on_finish_body_entered(body: Node3D) -> void:
 func _round_clear() -> void:
 	_set_state(State.ROUND_CLEAR)
 	_set_player_mode(false, false)
-	_taya.stop()
+	_stop_tayas()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	awra = mini(awra + AWRA_ROUND_CLEAR, MAX_AWRA)
 	_hud.set_awra(awra, MAX_AWRA)
-	_hud.show_status("Round %d clear! +%d Awra" % [round_number, AWRA_ROUND_CLEAR])
-	await get_tree().create_timer(2.0).timeout
+	var gained := int(round((_round_points + POINTS_ROUND_CLEAR) * (1.0 + 0.1 * (round_number - 1))))
+	score += gained
+	_round_points = 0
+	_hud.set_score(score)
+	_add_caps(CAPS_ROUND_CLEAR)
+	Economy.save_profile()
+	_hud.show_status("Round %d clear!  +%d points  +%d Awra  +%d tansan" % [round_number, gained, AWRA_ROUND_CLEAR, CAPS_ROUND_CLEAR])
+	await get_tree().create_timer(2.2).timeout
+	if state != State.ROUND_CLEAR:
+		return
 	round_number += 1
 	_hud.set_round(round_number)
 	_reset_field()
+	var joined := _ensure_tayas()
 	_enter_quiz()
+	if joined > 0:
+		var elite_joined: bool = _tayas.back().elite
+		_hud.show_status("Round %d: %s" % [round_number, "an ELITE taya joins! (3 tsinelas)" if elite_joined else "another taya joins!"])
 
 
 ## Everyone back to their starting spots for the next attempt.
@@ -331,7 +442,13 @@ func _reset_field() -> void:
 	_throw.clear_tsinelas()
 	_player.respawn(_spawn.global_position)
 	_lata.reset_to_home()
-	_taya.return_to_guard()
+	for t in _tayas:
+		t.return_to_guard()
+
+
+func _add_caps(amount: int) -> void:
+	_run_caps += amount
+	Economy.add_caps(amount)
 
 
 func _lose_awra(amount: int) -> void:
@@ -343,13 +460,41 @@ func _lose_awra(amount: int) -> void:
 
 func _game_over() -> void:
 	_set_state(State.GAME_OVER)
+	Economy.save_profile() # bank the tansan earned this run
 	_quiz.close()
 	_throw.end()
-	_taya.stop()
+	_stop_tayas()
 	_hud.show_throw_ui(false)
 	_set_player_mode(false, false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	_hud.show_status("Game over! Rounds cleared: %d\nPress R to play again" % (round_number - 1))
+	var rounds_cleared := round_number - 1
+	var rank := GameManager.submit_score(theme_id, score, rounds_cleared)
+	_hud.show_game_over(score, rounds_cleared, _run_caps, rank, GameManager.best_score(theme_id))
+
+
+# --- Pause ----------------------------------------------------------------------
+
+func _on_pause_requested() -> void:
+	if state == State.GAME_OVER:
+		return
+	if get_tree().paused:
+		_resume()
+	else:
+		get_tree().paused = true
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_hud.show_pause(true)
+
+
+func _resume() -> void:
+	_hud.show_pause(false)
+	get_tree().paused = false
+	if state == State.THROW or state == State.RUN:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _quit_to_menu() -> void:
+	Economy.save_profile()
+	GameManager.go_to_main_menu()
 
 
 ## move: walk/sprint allowed. look: mouse look allowed. Aim camera turns

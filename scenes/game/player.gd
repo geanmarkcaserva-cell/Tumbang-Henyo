@@ -48,6 +48,9 @@ func _ready() -> void:
 	stamina = max_stamina
 	_spring.add_excluded_object(get_rid())
 	add_to_group("player")
+	# Paper-cutout sprite of the character picked in Select character.
+	var palette: Dictionary = Economy.find_item("character", Economy.equipped_character).palette
+	$PaperDoll.set_textures(PixelArt.character(palette), PixelArt.character_back(palette))
 
 
 ## True during the dash burst: tags and tsinelas hits don't count.
@@ -109,8 +112,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			deg_to_rad(min_pitch_deg),
 			deg_to_rad(max_pitch_deg)
 		)
-	elif event.is_action_pressed("pause"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 

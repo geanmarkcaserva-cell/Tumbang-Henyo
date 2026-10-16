@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b3gegi4hh7c30"
+
+[deps]
+
+files=["res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.theme.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.tier.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.question.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.answer.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.explanation.translation"]
+
+source_file="res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.csv"
+dest_files=["res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.theme.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.tier.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.question.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.answer.translation", "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.explanation.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

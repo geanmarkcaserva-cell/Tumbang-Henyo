@@ -1,6 +1,7 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://be0deexm8sye1"]
 
-[ext_resource type="Script" path="res://scenes/game/player.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://dy47vcrr5cg7k" path="res://scenes/game/player.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://dya4modj3q4me" path="res://scenes/game/paper_doll.gd" id="2_dd427"]
 
 [sub_resource type="CapsuleShape3D" id="shape_player"]
 radius = 0.35
@@ -19,31 +20,36 @@ size = Vector3(0.5, 0.18, 0.2)
 [sub_resource type="StandardMaterial3D" id="mat_nose"]
 albedo_color = Color(0.95, 0.42, 0.58, 1)
 
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" unique_id=1300950000]
 script = ExtResource("1_player")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=481804034]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("shape_player")
 
-[node name="Body" type="MeshInstance3D" parent="."]
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1757201151]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+visible = false
 mesh = SubResource("mesh_body")
 surface_material_override/0 = SubResource("mat_body")
 
-[node name="Shirt" type="MeshInstance3D" parent="."]
+[node name="Shirt" type="MeshInstance3D" parent="." unique_id=813984405]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, -0.28)
+visible = false
 mesh = SubResource("mesh_nose")
 surface_material_override/0 = SubResource("mat_nose")
 
-[node name="CameraPivot" type="Node3D" parent="."]
+[node name="CameraPivot" type="Node3D" parent="." unique_id=2144430323]
 transform = Transform3D(1, 0, 0, 0, 0.969, -0.247, 0, 0.247, 0.969, 0, 1.7, 0)
 
-[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot"]
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=268496734]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0)
 spring_length = 4.0
 margin = 0.2
 
-[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D"]
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=1205559723]
 current = true
 fov = 70.0
+
+[node name="PaperDoll" type="Node3D" parent="." unique_id=124350482]
+script = ExtResource("2_dd427")

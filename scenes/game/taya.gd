@@ -20,6 +20,19 @@ signal hit_player ## one of this taya's tsinelas hit the player
 enum State { IDLE, GUARD, RESET, CHASE, WIND_UP, PICKUP, LUNGE, RECOVER }
 
 const TSINELAS_SCENE := preload("res://scenes/game/tsinelas.tscn")
+const MAX_WINDING_AT_ONCE := 2 ## so five tayas feel like pressure, not a firing squad
+const ELITE_FAN_SPREAD := 1.3 ## metres between the elite's three tsinelas
+
+## Placeholder sprite colours: red shirt + white headband; the elite cheater
+## wears a dark shirt and a red headband.
+const PALETTE := {"hair": Color(0.1, 0.08, 0.07), "skin": Color(0.78, 0.56, 0.42), "shirt": Color(0.82, 0.16, 0.16),
+		"accent": Color(1, 1, 1), "pants": Color(0.15, 0.15, 0.3), "feet": Color(0.95, 0.95, 0.95), "band": Color(0.97, 0.97, 0.97)}
+const ELITE_PALETTE := {"hair": Color(0.1, 0.08, 0.07), "skin": Color(0.72, 0.5, 0.36), "shirt": Color(0.16, 0.16, 0.2),
+		"accent": Color(0.9, 0.12, 0.12), "pants": Color(0.1, 0.1, 0.12), "feet": Color(0.9, 0.12, 0.12), "band": Color(0.92, 0.1, 0.1)}
+
+## Elite taya: carries 3 tsinelas (it cheats with a spare) and throws all
+## three at once in a fan.
+@export var elite := false
 
 @export var chase_speed := 6.4
 @export var reset_run_speed := 6.0
@@ -71,8 +84,15 @@ var _look_timer := 0.0
 
 
 func _ready() -> void:
+	add_to_group("taya")
+	if elite:
+		max_slippers = 3
 	_guard_transform = global_transform
 	slippers = max_slippers
+	var palette: Dictionary = ELITE_PALETTE if elite else PALETTE
+	$PaperDoll.set_textures(PixelArt.character(palette), PixelArt.character_back(palette))
+	if elite:
+		_ring.scale = Vector3.ONE * 2.4 # the fan covers a wider area
 	_move_dir = _flat(-global_basis.z).normalized()
 	_ring.top_level = true
 	_ring.visible = false
@@ -108,6 +128,13 @@ func return_to_guard() -> void:
 func start_reset() -> void:
 	state = State.RESET
 	_timer = 0.0
+
+
+## Another taya stood the lata up: join the chase.
+func start_chase() -> void:
+	if state == State.GUARD:
+		_look_timer = 0.0
+		state = State.CHASE
 
 
 func stop() -> void:
@@ -212,7 +239,8 @@ func _do_chase(delta: float) -> void:
 		return
 	var to_seen := _seen_pos - _flat(global_position)
 	var seen_distance := to_seen.length()
-	if _cooldown <= 0.0 and seen_distance >= throw_min_range and seen_distance <= throw_max_range:
+	if _cooldown <= 0.0 and seen_distance >= throw_min_range and seen_distance <= throw_max_range \
+			and _winding_count() < MAX_WINDING_AT_ONCE:
 		_start_wind_up(seen_distance)
 		return
 	# Close and lined up with where it thinks you are: commit to a lunge.
@@ -252,10 +280,15 @@ func _do_pickup(delta: float) -> void:
 		return
 	var to_slipper := _flat(_pickup_target.global_position - global_position)
 	if to_slipper.length() <= 0.9:
-		_thrown.erase(_pickup_target)
-		_pickup_target.queue_free()
-		_pickup_target = null
-		slippers += 1
+		if elite:
+			# The elite scoops up its whole set (and its spare) in one go.
+			_clear_thrown()
+			slippers = max_slippers
+		else:
+			_thrown.erase(_pickup_target)
+			_pickup_target.queue_free()
+			_pickup_target = null
+			slippers += 1
 		state = State.CHASE
 		return
 	_steer(to_slipper, chase_speed, delta)
@@ -290,10 +323,24 @@ func _start_wind_up(distance: float) -> void:
 func _throw() -> void:
 	var origin := global_transform * Vector3(0.35, 1.45, -0.35)
 	var flight_time := clampf(origin.distance_to(_throw_target) / 12.0, 0.5, 1.0)
-	var g := Vector3(0.0, -_gravity, 0.0)
-	# Ballistic launch so it lands on the warning ring.
-	var velocity_out := (_throw_target - origin - 0.5 * g * flight_time * flight_time) / flight_time
+	if elite:
+		# Fan of up to three: centre, left and right of the ring.
+		var side := _flat(_throw_target - origin).cross(Vector3.UP).normalized() * ELITE_FAN_SPREAD
+		var targets := [_throw_target, _throw_target + side, _throw_target - side]
+		for i in mini(slippers, 3):
+			_spawn_slipper(origin, targets[i], flight_time)
+		slippers = 0
+	else:
+		_spawn_slipper(origin, _throw_target, flight_time)
+		slippers -= 1
+	_cooldown = throw_cooldown
+	_ring_time = flight_time + 0.2
 
+
+func _spawn_slipper(origin: Vector3, target: Vector3, flight_time: float) -> void:
+	var g := Vector3(0.0, -_gravity, 0.0)
+	# Ballistic launch so it lands on the target.
+	var velocity_out := (target - origin - 0.5 * g * flight_time * flight_time) / flight_time
 	var slipper: RigidBody3D = TSINELAS_SCENE.instantiate()
 	slipper.target_group = "player"
 	slipper.hit_radius = thrown_hit_radius
@@ -304,9 +351,14 @@ func _throw() -> void:
 	slipper.launch(velocity_out, Vector3.ZERO)
 	_thrown.append(slipper)
 
-	slippers -= 1
-	_cooldown = throw_cooldown
-	_ring_time = flight_time + 0.2
+
+## How many tayas are winding up a throw right now.
+func _winding_count() -> int:
+	var n := 0
+	for t in get_tree().get_nodes_in_group("taya"):
+		if t.state == State.WIND_UP:
+			n += 1
+	return n
 
 
 func _tag() -> void:

@@ -1,6 +1,7 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dpfhfced1ewv"]
 
-[ext_resource type="Script" path="res://scenes/game/taya.gd" id="1_taya"]
+[ext_resource type="Script" uid="uid://ci7v1s6vtlp7" path="res://scenes/game/taya.gd" id="1_taya"]
+[ext_resource type="Script" uid="uid://dya4modj3q4me" path="res://scenes/game/paper_doll.gd" id="2_t4be0"]
 
 [sub_resource type="CapsuleShape3D" id="shape_taya"]
 radius = 0.35
@@ -32,36 +33,43 @@ ring_segments = 6
 shading_mode = 0
 albedo_color = Color(1, 0.15, 0.15, 1)
 
-[node name="Taya" type="CharacterBody3D"]
+[node name="Taya" type="CharacterBody3D" unique_id=1991048293]
 script = ExtResource("1_taya")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=831805886]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("shape_taya")
 
-[node name="Body" type="MeshInstance3D" parent="."]
+[node name="Body" type="MeshInstance3D" parent="." unique_id=232649152]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+visible = false
 mesh = SubResource("mesh_body")
 surface_material_override/0 = SubResource("mat_body")
 
-[node name="Headband" type="MeshInstance3D" parent="."]
+[node name="Headband" type="MeshInstance3D" parent="." unique_id=1945252276]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+visible = false
 mesh = SubResource("mesh_headband")
 surface_material_override/0 = SubResource("mat_headband")
 
-[node name="Face" type="MeshInstance3D" parent="."]
+[node name="Face" type="MeshInstance3D" parent="." unique_id=1527720380]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, -0.33)
+visible = false
 mesh = SubResource("mesh_face")
 surface_material_override/0 = SubResource("mat_headband")
 
-[node name="Label" type="Label3D" parent="."]
+[node name="Label" type="Label3D" parent="." unique_id=2104837637]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.05, 0)
+visible = false
 billboard = 1
 text = "TAYA"
 font_size = 48
 outline_size = 10
 
-[node name="WarningRing" type="MeshInstance3D" parent="."]
+[node name="WarningRing" type="MeshInstance3D" parent="." unique_id=15644652]
 cast_shadow = 0
 mesh = SubResource("mesh_ring")
 surface_material_override/0 = SubResource("mat_ring")
+
+[node name="PaperDoll" type="Node3D" parent="." unique_id=858749855]
+script = ExtResource("2_t4be0")

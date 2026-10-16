@@ -1,0 +1,9 @@
+id,theme,tier,question,choice_a,choice_b,choice_c,answer,explanation
+rrm_0001,rrm,easy,Ano ang dapat gawin kapag lumindol habang nasa loob ng silid?,"Duck, cover, and hold",Tumakbo palabas agad,Sumakay sa elevator,a,"Yumuko, sumilong sa ilalim ng matibay na mesa, at kumapit hanggang tumigil ang pagyanig."
+rrm_0002,rrm,easy,Anong ahensya ang naglalabas ng babala tungkol sa bagyo?,PAGASA,PHIVOLCS,DepEd,a,Ang PAGASA ang nagbabantay sa panahon at naglalabas ng mga babala sa bagyo.
+rrm_0003,rrm,easy,Anong ahensya ang nagbabantay sa lindol at bulkan?,PHIVOLCS,PAGASA,MMDA,a,Ang PHIVOLCS ang nagbabantay sa mga lindol, bulkan at tsunami.
+rrm_0004,rrm,easy,Ano ang dapat laman ng emergency go-bag?,"Tubig, pagkain, flashlight at first aid kit",Mga laruan at alahas,Telebisyon at speaker,a,"Maghanda ng go-bag na may tubig, pagkain, flashlight, radyo, gamot at first aid kit."
+rrm_0005,rrm,easy,"Kapag may babala ng tsunami, saan ka dapat pumunta?",Sa mataas na lugar,Sa dalampasigan,Sa basement,a,Lumikas agad sa mataas na lugar at lumayo sa baybayin.
+rrm_0006,rrm,easy,Ano ang dapat gawin kapag may rumaragasang baha sa kalsada?,Huwag tumawid,Lumangoy patawid,Magmaneho nang mabilis,a,Kahit mababaw ang baha ay kaya nitong tangayin ang tao o sasakyan.
+rrm_0007,rrm,easy,Ano ang ibig sabihin ng mas mataas na Wind Signal number?,Mas malakas na hangin,Mas mahinang hangin,Tapos na ang bagyo,a,Mas mataas na signal ay mas malakas na hanging inaasahan sa lugar.
+rrm_0008,rrm,easy,Ano ang pambansang emergency hotline sa Pilipinas?,911,117,143,a,Ang 911 ang pambansang emergency hotline ng Pilipinas.

@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/menus/tips_loading.tscn)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/menus/tips_loading.tscn"
+    }
+  ],
+  "id": "000144",
+  "timestamp": 1792159686.0,
+  "tool": "write_file"
+}

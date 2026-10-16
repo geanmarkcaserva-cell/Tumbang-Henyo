@@ -25,6 +25,14 @@ func get_themes() -> Array:
 	return _by_theme.keys()
 
 
+## A random fact for the loading screen, taken from a question's explanation.
+func random_tip(theme: String) -> String:
+	var pool: Array = _by_theme.get(theme, []).filter(func(q): return q.explanation != "")
+	if pool.is_empty():
+		return ""
+	return pool.pick_random().explanation
+
+
 ## Returns {id, theme, tier, question, choices: [a, b, c], answer: 0-2, explanation}
 ## or an empty dictionary when the theme has no questions.
 func next_question(theme: String, tier: String = "") -> Dictionary:

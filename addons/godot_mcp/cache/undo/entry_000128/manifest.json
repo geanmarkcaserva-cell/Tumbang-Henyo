@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://data/questions/rrm.csv.import)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://data/questions/rrm.csv.import"
+    }
+  ],
+  "id": "000128",
+  "timestamp": 1792159565.0,
+  "tool": "write_file"
+}

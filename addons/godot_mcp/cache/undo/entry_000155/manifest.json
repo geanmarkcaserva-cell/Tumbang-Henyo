@@ -1,0 +1,13 @@
+{
+  "args_summary": "setup_autoload(path=res://autoload/economy.gd, name=Economy)",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000155/files/project.godot",
+      "kind": "snapshot",
+      "path": "res://project.godot"
+    }
+  ],
+  "id": "000155",
+  "timestamp": 1792160056.0,
+  "tool": "setup_autoload"
+}

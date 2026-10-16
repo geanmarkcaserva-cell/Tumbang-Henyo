@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://data/questions/mythology.csv.import)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://data/questions/mythology.csv.import"
+    }
+  ],
+  "id": "000127",
+  "timestamp": 1792159564.0,
+  "tool": "write_file"
+}

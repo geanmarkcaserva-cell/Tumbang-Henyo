@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://autoload/economy.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://autoload/economy.gd"
+    }
+  ],
+  "id": "000154",
+  "timestamp": 1792160054.0,
+  "tool": "write_file"
+}

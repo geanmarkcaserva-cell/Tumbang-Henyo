@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://data/questions/history.csv)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://data/questions/history.csv"
+    }
+  ],
+  "id": "000130",
+  "timestamp": 1792159577.0,
+  "tool": "write_file"
+}

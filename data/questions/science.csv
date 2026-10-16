@@ -1,0 +1,9 @@
+id,theme,tier,question,choice_a,choice_b,choice_c,answer,explanation
+sci_0001,science,easy,Ano ang pinakamalapit na bituin sa Daigdig?,Araw,Buwan,Polaris,a,Ang Araw ay isang bituin at ito ang pinakamalapit sa Daigdig.
+sci_0002,science,easy,Ilang planeta ang nasa ating solar system?,8,9,7,a,"May walong planeta: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus at Neptune."
+sci_0003,science,easy,Ano ang kemikal na pormula ng tubig?,H2O,CO2,O2,a,Ang tubig ay binubuo ng dalawang hydrogen at isang oxygen.
+sci_0004,science,easy,Anong gas ang kailangan ng tao para huminga?,Oxygen,Carbon dioxide,Nitrogen,a,Oxygen ang ginagamit ng katawan; carbon dioxide ang inilalabas natin.
+sci_0005,science,easy,Ano ang tawag sa paggawa ng pagkain ng halaman gamit ang sikat ng araw?,Photosynthesis,Evaporation,Digestion,a,"Sa photosynthesis, ginagawang asukal ng halaman ang tubig at carbon dioxide gamit ang liwanag."
+sci_0006,science,easy,Ano ang pinakamalaking organ ng katawan ng tao?,Balat,Puso,Atay,a,Ang balat ang pinakamalaking organ ng katawan.
+sci_0007,science,easy,Ilang buto mayroon ang katawan ng isang adult?,206,106,306,a,May 206 na buto ang karaniwang adult; mas marami sa sanggol bago magsanib ang ilan.
+sci_0008,science,easy,Ano ang sagot sa 7 x 8?,56,54,64,a,7 x 8 = 56.

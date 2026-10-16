@@ -1,0 +1,12 @@
+{
+  "args_summary": "write_file(path=res://scenes/game/paper_doll.gd)",
+  "files": [
+    {
+      "kind": "created",
+      "path": "res://scenes/game/paper_doll.gd"
+    }
+  ],
+  "id": "000165",
+  "timestamp": 1792160633.0,
+  "tool": "write_file"
+}

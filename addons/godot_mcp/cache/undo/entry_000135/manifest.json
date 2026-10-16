@@ -1,0 +1,13 @@
+{
+  "args_summary": "delete_file(path=res://data/questions/kasaysayan.csv)",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000135/files/data/questions/kasaysayan.csv",
+      "kind": "deleted",
+      "path": "res://data/questions/kasaysayan.csv"
+    }
+  ],
+  "id": "000135",
+  "timestamp": 1792159618.0,
+  "tool": "delete_file"
+}

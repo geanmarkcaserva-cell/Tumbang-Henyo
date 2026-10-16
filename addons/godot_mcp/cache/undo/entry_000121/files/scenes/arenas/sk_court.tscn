@@ -1,0 +1,332 @@
+[gd_scene format=3 uid="uid://bmr6t7h0j7vth"]
+
+[ext_resource type="PackedScene" path="res://scenes/game/lata.tscn" id="1_lata"]
+[ext_resource type="PackedScene" path="res://scenes/game/taya.tscn" id="2_c0blr"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.32, 0.52, 0.82, 1)
+sky_horizon_color = Color(1, 0.76, 0.55, 1)
+ground_bottom_color = Color(0.3, 0.25, 0.2, 1)
+ground_horizon_color = Color(0.9, 0.7, 0.5, 1)
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_energy = 0.8
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(1, 0.82, 0.68, 1)
+fog_density = 0.006
+
+[sub_resource type="StandardMaterial3D" id="mat_ground"]
+albedo_color = Color(0.55, 0.47, 0.38, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_court"]
+albedo_color = Color(0.64, 0.63, 0.6, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="mat_line"]
+albedo_color = Color(0.95, 0.95, 0.9, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_finish"]
+albedo_color = Color(0.2, 0.95, 0.85, 1)
+emission_enabled = true
+emission = Color(0.2, 0.95, 0.85, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="mat_wall"]
+albedo_color = Color(0.68, 0.66, 0.6, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_house_a"]
+albedo_color = Color(0.86, 0.78, 0.62, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_roof"]
+albedo_color = Color(0.62, 0.33, 0.2, 1)
+metallic = 0.4
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="mat_house_b"]
+albedo_color = Color(0.6, 0.76, 0.7, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_store"]
+albedo_color = Color(0.95, 0.8, 0.3, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_metal"]
+albedo_color = Color(0.35, 0.36, 0.38, 1)
+metallic = 0.5
+
+[sub_resource type="StandardMaterial3D" id="mat_rim"]
+albedo_color = Color(1, 0.45, 0.1, 1)
+
+[sub_resource type="StandardMaterial3D" id="mat_sign"]
+albedo_color = Color(0.8, 0.15, 0.15, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_frdg6"]
+size = Vector3(18, 3, 1)
+
+[node name="SKCourt" type="Node3D" unique_id=2106329543]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=396900055]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1792255709]
+transform = Transform3D(0.5, 0, -0.866, -0.497, 0.819, -0.287, 0.709, 0.574, 0.41, 0, 10, 0)
+light_color = Color(1, 0.85, 0.65, 1)
+light_energy = 1.3
+shadow_enabled = true
+
+[node name="Geometry" type="Node3D" parent="." unique_id=1913206090]
+
+[node name="Ground" type="CSGBox3D" parent="Geometry" unique_id=1559811294]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, -15)
+use_collision = true
+size = Vector3(46, 1, 70)
+material = SubResource("mat_ground")
+
+[node name="Court" type="CSGBox3D" parent="Geometry" unique_id=875990073]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, -20)
+size = Vector3(18, 0.02, 44)
+material = SubResource("mat_court")
+
+[node name="ThrowLine" type="CSGBox3D" parent="Geometry" unique_id=813645564]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+size = Vector3(18, 0.03, 0.12)
+material = SubResource("mat_line")
+
+[node name="SideLineL" type="CSGBox3D" parent="Geometry" unique_id=887957096]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0.02, -20)
+size = Vector3(0.12, 0.03, 44)
+material = SubResource("mat_line")
+
+[node name="SideLineR" type="CSGBox3D" parent="Geometry" unique_id=1392485499]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0.02, -20)
+size = Vector3(0.12, 0.03, 44)
+material = SubResource("mat_line")
+
+[node name="CircleOuter" type="CSGCylinder3D" parent="Geometry" unique_id=445692430]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, -14)
+radius = 0.65
+height = 0.02
+sides = 24
+material = SubResource("mat_line")
+
+[node name="CircleInner" type="CSGCylinder3D" parent="Geometry" unique_id=2063397219]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, -14)
+radius = 0.57
+height = 0.02
+sides = 24
+material = SubResource("mat_court")
+
+[node name="FinishStrip" type="CSGBox3D" parent="Geometry" unique_id=2042834953]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, -40)
+size = Vector3(18, 0.04, 1)
+material = SubResource("mat_finish")
+
+[node name="WallLeft" type="CSGBox3D" parent="Geometry" unique_id=1025388856]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.5, 1.25, -15)
+use_collision = true
+size = Vector3(0.3, 2.5, 60)
+material = SubResource("mat_wall")
+
+[node name="WallRight" type="CSGBox3D" parent="Geometry" unique_id=1810646414]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 1.25, -15)
+use_collision = true
+size = Vector3(0.3, 2.5, 60)
+material = SubResource("mat_wall")
+
+[node name="WallBack" type="CSGBox3D" parent="Geometry" unique_id=1311887610]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, -45)
+use_collision = true
+size = Vector3(27.3, 2.5, 0.3)
+material = SubResource("mat_wall")
+
+[node name="WallFront" type="CSGBox3D" parent="Geometry" unique_id=1123498936]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 15)
+use_collision = true
+size = Vector3(27.3, 2.5, 0.3)
+material = SubResource("mat_wall")
+
+[node name="HouseL1" type="CSGBox3D" parent="Geometry" unique_id=634707211]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 1.75, 8)
+size = Vector3(7, 3.5, 8)
+material = SubResource("mat_house_a")
+
+[node name="RoofL1" type="CSGBox3D" parent="Geometry" unique_id=827084940]
+transform = Transform3D(0.9903, 0.1392, 0, -0.1392, 0.9903, 0, 0, 0, 1, -17.5, 3.6, 8)
+size = Vector3(7.6, 0.15, 8.6)
+material = SubResource("mat_roof")
+
+[node name="HouseL2" type="CSGBox3D" parent="Geometry" unique_id=1918654070]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 2.5, -4)
+size = Vector3(7, 5, 9)
+material = SubResource("mat_house_b")
+
+[node name="RoofL2" type="CSGBox3D" parent="Geometry" unique_id=674393547]
+transform = Transform3D(0.9903, 0.1392, 0, -0.1392, 0.9903, 0, 0, 0, 1, -17.5, 5.1, -4)
+size = Vector3(7.6, 0.15, 9.6)
+material = SubResource("mat_roof")
+
+[node name="HouseL3" type="CSGBox3D" parent="Geometry" unique_id=1752079057]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 2, -16)
+size = Vector3(7, 4, 8)
+material = SubResource("mat_house_a")
+
+[node name="RoofL3" type="CSGBox3D" parent="Geometry" unique_id=548340084]
+transform = Transform3D(0.9903, 0.1392, 0, -0.1392, 0.9903, 0, 0, 0, 1, -17.5, 4.1, -16)
+size = Vector3(7.6, 0.15, 8.6)
+material = SubResource("mat_roof")
+
+[node name="HouseL4" type="CSGBox3D" parent="Geometry" unique_id=1005198032]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 3, -30)
+size = Vector3(7, 6, 10)
+material = SubResource("mat_house_b")
+
+[node name="RoofL4" type="CSGBox3D" parent="Geometry" unique_id=119018525]
+transform = Transform3D(0.9903, 0.1392, 0, -0.1392, 0.9903, 0, 0, 0, 1, -17.5, 6.1, -30)
+size = Vector3(7.6, 0.15, 10.6)
+material = SubResource("mat_roof")
+
+[node name="HouseR1" type="CSGBox3D" parent="Geometry" unique_id=2101112304]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.5, 2.25, 6)
+size = Vector3(7, 4.5, 9)
+material = SubResource("mat_house_b")
+
+[node name="RoofR1" type="CSGBox3D" parent="Geometry" unique_id=439703109]
+transform = Transform3D(0.9903, -0.1392, 0, 0.1392, 0.9903, 0, 0, 0, 1, 17.5, 4.6, 6)
+size = Vector3(7.6, 0.15, 9.6)
+material = SubResource("mat_roof")
+
+[node name="HouseR2" type="CSGBox3D" parent="Geometry" unique_id=717197153]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.5, 1.75, -7)
+size = Vector3(7, 3.5, 8)
+material = SubResource("mat_house_a")
+
+[node name="RoofR2" type="CSGBox3D" parent="Geometry" unique_id=369202069]
+transform = Transform3D(0.9903, -0.1392, 0, 0.1392, 0.9903, 0, 0, 0, 1, 17.5, 3.6, -7)
+size = Vector3(7.6, 0.15, 8.6)
+material = SubResource("mat_roof")
+
+[node name="HouseR3" type="CSGBox3D" parent="Geometry" unique_id=1529243678]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.5, 2.75, -20)
+size = Vector3(7, 5.5, 9)
+material = SubResource("mat_house_b")
+
+[node name="RoofR3" type="CSGBox3D" parent="Geometry" unique_id=726014778]
+transform = Transform3D(0.9903, -0.1392, 0, 0.1392, 0.9903, 0, 0, 0, 1, 17.5, 5.6, -20)
+size = Vector3(7.6, 0.15, 9.6)
+material = SubResource("mat_roof")
+
+[node name="HouseR4" type="CSGBox3D" parent="Geometry" unique_id=1823636114]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.5, 2, -34)
+size = Vector3(7, 4, 10)
+material = SubResource("mat_house_a")
+
+[node name="RoofR4" type="CSGBox3D" parent="Geometry" unique_id=1603621342]
+transform = Transform3D(0.9903, -0.1392, 0, 0.1392, 0.9903, 0, 0, 0, 1, 17.5, 4.1, -34)
+size = Vector3(7.6, 0.15, 10.6)
+material = SubResource("mat_roof")
+
+[node name="SariSari" type="CSGBox3D" parent="Geometry" unique_id=1886675758]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 1.3, -4)
+use_collision = true
+size = Vector3(3.2, 2.6, 2.6)
+material = SubResource("mat_store")
+
+[node name="SariSariAwning" type="CSGBox3D" parent="Geometry" unique_id=610482736]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 2.4, -4)
+size = Vector3(1.2, 0.1, 3.4)
+material = SubResource("mat_roof")
+
+[node name="Bench1" type="CSGBox3D" parent="Geometry" unique_id=1307365681]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 0.225, -6)
+use_collision = true
+size = Vector3(0.5, 0.45, 2.5)
+material = SubResource("mat_metal")
+
+[node name="Bench2" type="CSGBox3D" parent="Geometry" unique_id=786293746]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 0.225, -14)
+use_collision = true
+size = Vector3(0.5, 0.45, 2.5)
+material = SubResource("mat_metal")
+
+[node name="HoopPost" type="CSGBox3D" parent="Geometry" unique_id=1804432069]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, -44.3)
+use_collision = true
+size = Vector3(0.2, 3.4, 0.2)
+material = SubResource("mat_metal")
+
+[node name="HoopArm" type="CSGBox3D" parent="Geometry" unique_id=175657510]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.1, -43.7)
+size = Vector3(0.12, 0.12, 1.2)
+material = SubResource("mat_metal")
+
+[node name="Backboard" type="CSGBox3D" parent="Geometry" unique_id=1467775722]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4, -43.1)
+size = Vector3(1.8, 1.05, 0.06)
+material = SubResource("mat_line")
+
+[node name="Rim" type="CSGTorus3D" parent="Geometry" unique_id=812038897]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.05, -42.8)
+inner_radius = 0.2
+outer_radius = 0.24
+sides = 16
+material = SubResource("mat_rim")
+
+[node name="SignPost" type="CSGBox3D" parent="Geometry" unique_id=643360187]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 1.6, -24)
+use_collision = true
+size = Vector3(0.15, 3.2, 0.15)
+material = SubResource("mat_metal")
+
+[node name="SignBoard" type="CSGBox3D" parent="Geometry" unique_id=1162455813]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 3.6, -24)
+size = Vector3(2.6, 1.2, 0.1)
+material = SubResource("mat_sign")
+
+[node name="SignText" type="Label3D" parent="Geometry" unique_id=1992071590]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 3.6, -23.93)
+text = "SK COURT"
+font_size = 72
+
+[node name="PoleL1" type="CSGBox3D" parent="Geometry" unique_id=1393046717]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 3.5, 2)
+use_collision = true
+size = Vector3(0.25, 7, 0.25)
+material = SubResource("mat_wall")
+
+[node name="PoleL2" type="CSGBox3D" parent="Geometry" unique_id=43869923]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 3.5, -22)
+use_collision = true
+size = Vector3(0.25, 7, 0.25)
+material = SubResource("mat_wall")
+
+[node name="PoleR1" type="CSGBox3D" parent="Geometry" unique_id=317058992]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 3.5, -12)
+use_collision = true
+size = Vector3(0.25, 7, 0.25)
+material = SubResource("mat_wall")
+
+[node name="PoleR2" type="CSGBox3D" parent="Geometry" unique_id=2108136079]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 3.5, -38)
+use_collision = true
+size = Vector3(0.25, 7, 0.25)
+material = SubResource("mat_wall")
+
+[node name="Lata" parent="." unique_id=89871477 instance=ExtResource("1_lata")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.21, -14)
+
+[node name="FinishLine" type="Area3D" parent="." unique_id=1104451471]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -40)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FinishLine" unique_id=1804079208]
+shape = SubResource("BoxShape3D_frdg6")
+
+[node name="PlayerSpawn" type="Marker3D" parent="." unique_id=643251282]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
+
+[node name="Taya" parent="." unique_id=898218167 instance=ExtResource("2_c0blr")]
+transform = Transform3D(-1, 0, 2.5351817e-06, 0, 1, 0, -2.5351817e-06, 0, -1, 1.5, 0, -15)

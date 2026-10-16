@@ -11,14 +11,16 @@ config_version=5
 [application]
 
 config/name="Tumbang Henyo"
-run/main_scene="res://scenes/game/game.tscn"
-config/features=PackedStringArray("4.6", "GL Compatibility")
+run/main_scene="res://scenes/menus/boot_loading.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 MCPRuntime="*uid://t5glcrwvkt67"
 QuizDatabase="*res://autoload/quiz_database.gd"
+GameManager="*res://autoload/game_manager.gd"
+Economy="*res://autoload/economy.gd"
 
 [display]
 
@@ -138,3 +140,4 @@ dash={
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/compress_with_gpu=false

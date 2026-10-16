@@ -1,0 +1,18 @@
+{
+  "args_summary": "batch_execute",
+  "files": [
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000166/files/scenes/game/player.tscn",
+      "kind": "snapshot",
+      "path": "res://scenes/game/player.tscn"
+    },
+    {
+      "backup": "res://addons/godot_mcp/cache/undo/entry_000166/files/scenes/game/taya.tscn",
+      "kind": "snapshot",
+      "path": "res://scenes/game/taya.tscn"
+    }
+  ],
+  "id": "000166",
+  "timestamp": 1792160637.0,
+  "tool": "batch_execute"
+}

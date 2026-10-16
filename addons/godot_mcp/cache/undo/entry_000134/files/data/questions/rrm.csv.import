@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://d2568yh6njurt"
+
+[deps]
+
+files=["res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.theme.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.tier.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.question.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.answer.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.explanation.translation"]
+
+source_file="res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.csv"
+dest_files=["res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.theme.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.tier.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.question.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.choice.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.answer.translation", "res://addons/godot_mcp/cache/undo/entry_000134/files/data/questions/rrm.explanation.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

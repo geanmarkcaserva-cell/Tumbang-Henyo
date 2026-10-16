@@ -126,6 +126,17 @@ func _draw_preview() -> void:
 	_preview_mesh.surface_end()
 
 
+## Colour the thrown tsinelas like the slipper picked in weapon select.
+func _tint_equipped_slipper(slipper: Node3D) -> void:
+	var palette := Economy.slipper_palette()
+	for part in [["Sole", palette.sole], ["Strap", palette.strap]]:
+		var mesh := slipper.get_node_or_null(part[0]) as MeshInstance3D
+		if mesh:
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = part[1]
+			mesh.material_override = mat
+
+
 func _launch() -> void:
 	active = false
 	_preview_mesh.clear_surfaces()
@@ -136,6 +147,7 @@ func _launch() -> void:
 	get_parent().add_child(_tsinelas)
 	_tsinelas.global_transform = Transform3D(Basis.looking_at(velocity.normalized(), Vector3.UP), origin)
 	_tsinelas.add_collision_exception_with(_player)
+	_tint_equipped_slipper(_tsinelas)
 	_tsinelas.settled.connect(func(): settled.emit())
 	_tsinelas.launch(velocity, _wind_accel())
 

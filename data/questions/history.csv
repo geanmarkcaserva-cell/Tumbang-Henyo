@@ -1,0 +1,13 @@
+id,theme,tier,question,choice_a,choice_b,choice_c,answer,explanation
+his_0001,history,easy,Sino ang sumulat ng Noli Me Tangere?,Andres Bonifacio,Jose Rizal,Apolinario Mabini,b,Isinulat ni Jose Rizal ang Noli Me Tangere noong 1887.
+his_0002,history,easy,Sino ang Supremo ng Katipunan?,Emilio Aguinaldo,Andres Bonifacio,Jose Rizal,b,Si Andres Bonifacio ang Supremo ng Katipunan.
+his_0003,history,easy,"Kailan idineklara ang kalayaan ng Pilipinas sa Kawit, Cavite?","Hunyo 12, 1898","Hulyo 4, 1946","Disyembre 30, 1896",a,"Idineklara ang kalayaan noong Hunyo 12, 1898."
+his_0004,history,easy,Sino ang unang pangulo ng Pilipinas?,Manuel L. Quezon,Emilio Aguinaldo,Jose P. Laurel,b,Si Emilio Aguinaldo ang unang pangulo ng Pilipinas.
+his_0005,history,easy,Ano ang lihim na samahang itinatag ni Andres Bonifacio?,La Liga Filipina,Katipunan,Propaganda Movement,b,Itinatag ni Bonifacio ang Katipunan noong 1892.
+his_0006,history,easy,Saang lalawigan matatagpuan ang Banaue Rice Terraces?,Ifugao,Benguet,Bohol,a,Nasa Ifugao ang Banaue Rice Terraces.
+his_0007,history,easy,Sino ang tinaguriang Utak ng Katipunan?,Emilio Jacinto,Antonio Luna,Gregorio del Pilar,a,Si Emilio Jacinto ang tinaguriang Utak ng Katipunan.
+his_0008,history,easy,Anong taon dumating si Ferdinand Magellan sa Pilipinas?,1521,1565,1898,a,Dumating si Magellan sa Pilipinas noong 1521.
+his_0009,history,easy,Sinong pinuno ang tumalo kay Magellan sa Labanan sa Mactan?,Lapulapu,Rajah Humabon,Rajah Sulayman,a,Tinalo ng pangkat ni Lapulapu si Magellan sa Mactan.
+his_0010,history,easy,Sino ang tinaguriang Dakilang Lumpo?,Apolinario Mabini,Marcelo H. del Pilar,Graciano Lopez Jaena,a,Si Apolinario Mabini ang Dakilang Lumpo.
+his_0011,history,easy,Sa anong wika orihinal na isinulat ang Noli Me Tangere?,Tagalog,Kastila,Ingles,b,Isinulat ito ni Rizal sa wikang Kastila.
+his_0012,history,easy,Saan binaril si Jose Rizal noong 1896?,Bagumbayan,Cebu,Kawit,a,"Binaril si Rizal sa Bagumbayan (Luneta) noong Disyembre 30, 1896."

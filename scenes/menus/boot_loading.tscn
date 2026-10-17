@@ -1,8 +1,8 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dw4l76cna5lm3"]
 
-[ext_resource type="Script" path="res://scenes/menus/boot_loading.gd" id="1_boot"]
+[ext_resource type="Script" uid="uid://chiuijxfpko24" path="res://scenes/menus/boot_loading.gd" id="1_boot"]
 
-[node name="BootLoading" type="Control"]
+[node name="BootLoading" type="Control" unique_id=2101545574]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

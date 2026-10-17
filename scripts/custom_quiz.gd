@@ -92,10 +92,10 @@ static var _inline_key_re := RegEx.create_from_string("(?i)\\s+(?=(?:why|answer|
 
 ## Returns {questions: Array, errors: Array[String]}. Questions use the same
 ## shape as QuizDatabase: {id, theme, tier, question, choices, answer, explanation}.
-static func parse(text: String, theme_id: String = "custom:preview") -> Dictionary:
+static func parse(text: String, theme: String = "custom:preview") -> Dictionary:
 	text = _clean_ai_text(text.replace("\r\n", "\n").replace("\r", "\n"))
 	if _looks_like_csv(text):
-		return _parse_csv(text, theme_id)
+		return _parse_csv(text, theme)
 	var errors: Array[String] = []
 	var blocks := _split_blocks(text)
 	var raw: Array = []
@@ -116,8 +116,8 @@ static func parse(text: String, theme_id: String = "custom:preview") -> Dictiona
 		if built.has("error"):
 			errors.append("Question near line %d: %s" % [q.line, built.error])
 			continue
-		built.id = "%s#%d" % [theme_id, questions.size() + 1]
-		built.theme = theme_id
+		built.id = "%s#%d" % [theme, questions.size() + 1]
+		built.theme = theme
 		built.tier = "easy"
 		questions.append(built)
 	if questions.is_empty() and errors.is_empty():
@@ -285,7 +285,7 @@ static func _looks_like_csv(text: String) -> bool:
 	return first.contains("question") and first.contains("choice_a") and first.contains(",")
 
 
-static func _parse_csv(text: String, theme_id: String) -> Dictionary:
+static func _parse_csv(text: String, theme: String) -> Dictionary:
 	# Same columns as res://data/questions/*.csv; reuse the plain-text parser by
 	# rewriting rows into the text format.
 	var path := "user://__custom_import.csv"
@@ -311,7 +311,7 @@ static func _parse_csv(text: String, theme_id: String) -> Dictionary:
 		out += "\n"
 	f.close()
 	DirAccess.remove_absolute(path)
-	return parse(out, theme_id)
+	return parse(out, theme)
 
 
 # --- Files (.txt / .csv / .docx) ----------------------------------------------

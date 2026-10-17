@@ -23,9 +23,13 @@ ambient_light_energy = 0.7
 reflected_light_source = 1
 tonemap_mode = 4
 fog_enabled = true
-fog_light_color = Color(0.98, 0.72, 0.58, 1)
-fog_density = 0.0018
-fog_sky_affect = 0.3
+fog_light_color = Color(0.74, 0.68, 0.66, 1)
+fog_sun_scatter = 0.35
+fog_density = 0.0085
+fog_aerial_perspective = 0.35
+fog_sky_affect = 0.75
+fog_height = 2.5
+fog_height_density = 0.006
 
 [sub_resource type="StandardMaterial3D" id="mat_court"]
 albedo_color = Color(0.64, 0.63, 0.6, 1)

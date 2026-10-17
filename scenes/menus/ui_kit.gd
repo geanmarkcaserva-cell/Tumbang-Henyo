@@ -1,8 +1,15 @@
 class_name UiKit
 extends RefCounted
-## Placeholder menu styling based on the menu mockups: rounded light-blue
-## buttons with a dark-blue border and white outlined text. Swap for the
-## final art once the UI PNGs are exported.
+## Menu styling: buttons use the hand-drawn button art from art/ui (made from
+## art/assets UI/Button icon.png, plus cyan and gold recolours), with white
+## outlined text. Panels are still flat boxes.
+
+const BUTTON_BLUE := preload("res://art/ui/button_blue.png")
+const BUTTON_CYAN := preload("res://art/ui/button_cyan.png")
+const BUTTON_GOLD := preload("res://art/ui/button_gold.png")
+const LOGO := preload("res://art/ui/logo.png")
+## Size of the button art's frame (border + bevel) in pixels; the middle stretches.
+const BUTTON_SLICE := 20
 
 const BLUE := Color(0.43, 0.73, 0.86)
 const CYAN := Color(0.69, 0.91, 0.93)
@@ -41,14 +48,47 @@ static func button(text: String, fill: Color = BLUE, font_size: int = 56, min_si
 	return b
 
 
-## Recolour a button, optionally with the gold "selected" border.
+## Recolour a button: BLUE, CYAN or GOLD art. Selected buttons (the chosen
+## theme or custom set) turn gold.
 static func set_fill(b: Button, fill: Color, selected: bool) -> void:
-	var border := SELECTED_BORDER if selected else BORDER
-	var w := 10 if selected else 6
-	b.add_theme_stylebox_override("normal", box(fill, border, w))
-	b.add_theme_stylebox_override("hover", box(fill.lightened(0.12), border, w))
-	b.add_theme_stylebox_override("pressed", box(fill.darkened(0.12), border, w))
-	b.add_theme_stylebox_override("disabled", box(fill.darkened(0.35), border, w))
+	var tex: Texture2D = BUTTON_BLUE
+	if selected or fill == GOLD:
+		tex = BUTTON_GOLD
+	elif fill == CYAN:
+		tex = BUTTON_CYAN
+	b.add_theme_stylebox_override("normal", button_box(tex, Color.WHITE))
+	b.add_theme_stylebox_override("hover", button_box(tex, Color(1.12, 1.12, 1.12)))
+	b.add_theme_stylebox_override("pressed", button_box(tex, Color(0.86, 0.86, 0.86), 4))
+	b.add_theme_stylebox_override("disabled", button_box(tex, Color(0.55, 0.55, 0.6)))
+
+
+## 9-slice stylebox from the button art. push_down moves the label down a
+## little (pressed look).
+static func button_box(tex: Texture2D, tint: Color, push_down: int = 0) -> StyleBoxTexture:
+	var s := StyleBoxTexture.new()
+	s.texture = tex
+	s.texture_margin_left = BUTTON_SLICE
+	s.texture_margin_right = BUTTON_SLICE
+	s.texture_margin_top = BUTTON_SLICE
+	s.texture_margin_bottom = BUTTON_SLICE
+	s.modulate_color = tint
+	s.content_margin_left = 28
+	s.content_margin_right = 28
+	s.content_margin_top = 8 + push_down
+	s.content_margin_bottom = 16 - push_down
+	return s
+
+
+## The game logo (art/ui/logo.png), scaled to the given width.
+static func logo(width: float) -> TextureRect:
+	var t := TextureRect.new()
+	t.texture = LOGO
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	t.size = Vector2(width, width * LOGO.get_height() / LOGO.get_width())
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return t
 
 
 static func label(text: String, font_size: int = 40, color: Color = Color.WHITE, outline: int = 0) -> Label:

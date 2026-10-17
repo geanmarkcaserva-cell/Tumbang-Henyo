@@ -5,6 +5,8 @@ extends Control
 
 @export var min_time := 2.2 ## keep the screen up at least this long
 
+const MASCOT := preload("res://art/ui/loading_slipper.png")
+
 const STEPS := [
 	"Loading quiz questions...",
 	"Building the barangay court...",
@@ -21,6 +23,7 @@ var _loading: Label
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Music.play("menu")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	var bg := ColorRect.new()
@@ -52,7 +55,7 @@ func _process(delta: float) -> void:
 	_explainer.text = STEPS[mini(int(shown * STEPS.size()), STEPS.size() - 1)]
 	_loading.text = "Loading" + ".".repeat(int(_time * 3.0) % 4)
 	# Little wobble, like a slipper about to be thrown.
-	_mascot.rotation = deg_to_rad(-22.0 + sin(_time * 5.0) * 6.0)
+	_mascot.rotation = deg_to_rad(sin(_time * 5.0) * 6.0) # the art is already tilted
 	_mascot.scale = Vector2.ONE * (1.0 + sin(_time * 2.5) * 0.03)
 
 	if status == ResourceLoader.THREAD_LOAD_LOADED and _time >= min_time:
@@ -64,43 +67,11 @@ func _process(delta: float) -> void:
 		Transition.change_scene(GameManager.MAIN_MENU)
 
 
-## Placeholder mascot: a white tsinelas with a black strap and grey toes.
+## The tsinelas mascot (art/ui/loading_slipper.png, from "Loading icon first").
 func _build_mascot() -> Node2D:
 	var root := Node2D.new()
-	var sole := Polygon2D.new()
-	sole.color = Color.WHITE
-	sole.polygon = _ellipse(Vector2.ZERO, Vector2(230, 105), 40)
-	root.add_child(sole)
-	var heel := Polygon2D.new()
-	heel.color = Color(0.8, 0.8, 0.8)
-	heel.polygon = _ellipse(Vector2(130, -5), Vector2(70, 55), 24)
-	root.add_child(heel)
-	for toe in [Vector2(-185, -25), Vector2(-175, 20), Vector2(-160, 55)]:
-		var t := Polygon2D.new()
-		t.color = Color(0.82, 0.82, 0.82)
-		t.polygon = _ellipse(toe, Vector2(22, 16), 16)
-		root.add_child(t)
-	var strap := Line2D.new()
-	strap.width = 12
-	strap.default_color = Color.BLACK
-	strap.joint_mode = Line2D.LINE_JOINT_ROUND
-	strap.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	strap.end_cap_mode = Line2D.LINE_CAP_ROUND
-	strap.points = PackedVector2Array([Vector2(-140, 20), Vector2(-40, -20), Vector2(60, 15), Vector2(150, 10)])
-	root.add_child(strap)
-	var post := Line2D.new()
-	post.width = 12
-	post.default_color = Color.BLACK
-	post.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	post.end_cap_mode = Line2D.LINE_CAP_ROUND
-	post.points = PackedVector2Array([Vector2(-40, -20), Vector2(-5, -65)])
-	root.add_child(post)
+	var sprite := Sprite2D.new()
+	sprite.texture = MASCOT
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	root.add_child(sprite)
 	return root
-
-
-func _ellipse(center: Vector2, radii: Vector2, points: int) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for i in points:
-		var a := TAU * i / points
-		out.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
-	return out

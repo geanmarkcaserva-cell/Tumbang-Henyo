@@ -1,3 +1,11 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Godot MCP plugin working files (undo snapshots, screenshots, helper scripts)
+addons/godot_mcp/cache/
+
+# Blender / image editor backups
+*.blend1
+*.blend2
+*~

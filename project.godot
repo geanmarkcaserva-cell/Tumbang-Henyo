@@ -13,7 +13,7 @@ config_version=5
 config/name="Tumbang Henyo"
 run/main_scene="res://scenes/menus/boot_loading.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="res://art/ui/app_icon.png"
 
 [autoload]
 
@@ -22,6 +22,8 @@ QuizDatabase="*res://autoload/quiz_database.gd"
 GameManager="*res://autoload/game_manager.gd"
 Economy="*res://autoload/economy.gd"
 Transition="*res://autoload/transition.gd"
+Sfx="*res://autoload/sfx.gd"
+Music="*res://autoload/music.gd"
 
 [display]
 

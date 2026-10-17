@@ -70,6 +70,7 @@ var _lata_home := Vector3.ZERO
 
 func _ready() -> void:
 	get_tree().paused = false
+	Music.play("game")
 	theme_id = GameManager.selected_theme
 	_lata_home = _lata.global_position
 	_player.respawn(_spawn.global_position)

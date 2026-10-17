@@ -66,6 +66,7 @@ var _slipper_sprite: Sprite3D
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Music.play("menu")
 	_build_preview()
 	var ui := CanvasLayer.new()
 	add_child(ui)
@@ -219,14 +220,9 @@ func _build_main(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
 
-	var logo := UiKit.label("Logo", 120, Color.WHITE, 18)
-	logo.position = Vector2(240, 150)
+	var logo := UiKit.logo(900)
+	logo.position = Vector2(110, 150)
 	root.add_child(logo)
-	var title := UiKit.label("Tumbang\n      Henyo", 96, Color(0.1, 0.08, 0.06), 0)
-	title.add_theme_color_override("font_outline_color", Color.WHITE)
-	title.add_theme_constant_override("outline_size", 16)
-	title.position = Vector2(120, 340)
-	root.add_child(title)
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 36)

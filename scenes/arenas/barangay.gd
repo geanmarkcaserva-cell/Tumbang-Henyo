@@ -1,29 +1,70 @@
 extends Node3D
-## The barangay around the SK Court: land, houses and props (one model), plus
-## plants and collisions laid out from barangay_layout.json (exported from
-## art/source/barangay_land.blend).
+## The barangay around the SK Court: flat land, roads and electric posts (one
+## model), plus houses, plants and collisions laid out from
+## barangay_layout.json (written by the scripts in art/source/).
 ##
-## Plants are drawn as one MultiMesh per plant type, so 66 grass clumps cost
-## about the same as one. Small plants fade out with distance and cast no
-## shadows (cheap on phones, invisible at sunset anyway).
+## Plants are drawn as one MultiMesh per plant type, so thousands of grass
+## clumps cost about the same as one. Small plants fade out with distance and
+## cast no shadows (cheap on phones).
+##
+## Forced perspective: houses and trees far from the court are built bigger,
+## so the barangay feels deeper than it is.
 
 const ENV_SCENE := preload("res://art/environment/barangay_env.glb")
 const PLANTS_SCENE := preload("res://art/environment/barangay_plants.glb")
+## The textured house variants (art/source/house variantions.blend).
+const HOUSES_SCENE := preload("res://art/environment/house_variants.glb")
 const LAYOUT_PATH := "res://art/environment/barangay_layout.json"
+## Middle of the court; distances for forced perspective are measured from here.
+const COURT_CENTRE := Vector2(0.0, -20.0)
 
-@export var small_plant_fade_start := 26.0 ## metres from the camera
-@export var small_plant_fade_end := 34.0
+@export var small_plant_fade_start := 30.0 ## metres from the camera
+@export var small_plant_fade_end := 40.0
 @export var card_alpha_cutoff := 0.4
+@export_group("Trees grow with distance")
+@export var tree_growth_start := 35.0 ## trees closer than this keep their size
+@export var tree_growth_per_metre := 0.022 ## +2.2% size per metre beyond that
+@export var tree_growth_max := 3.2
 
 
 func _ready() -> void:
-	add_child(ENV_SCENE.instantiate())
+	var env := ENV_SCENE.instantiate()
+	add_child(env)
 	var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT_PATH))
 	if layout == null:
 		push_error("Barangay: can't read %s" % LAYOUT_PATH)
 		return
+	if layout.has("houses"):
+		for n in env.find_children("House_*", "", true, false):
+			n.queue_free()
+		_build_houses(layout.houses)
 	_build_plants(layout)
 	_build_colliders(layout.boxes)
+
+
+func _build_houses(entries: Array) -> void:
+	var library := HOUSES_SCENE.instantiate()
+	var meshes := {}
+	for mi in library.find_children("*", "MeshInstance3D", true, false):
+		meshes[mi.name] = mi.mesh
+	library.free()
+	var root := Node3D.new()
+	root.name = "Houses"
+	add_child(root)
+	for e in entries:
+		var mesh: Mesh = meshes.get(e.name)
+		if mesh == null:
+			push_warning("Barangay: no house mesh %s" % e.name)
+			continue
+		var mi := MeshInstance3D.new()
+		mi.name = "%s_%s" % [e.lot, e.name]
+		mi.mesh = mesh
+		var p: Array = e.p
+		var s := float(e.get("s", 1.0))
+		mi.transform = Transform3D(Basis(Vector3.UP, float(e.ry)).scaled(Vector3.ONE * s), Vector3(p[0], p[1], p[2]))
+		if s > 1.05: # far-off scenery: the shadow would be outside the shadow range anyway
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mi)
 
 
 func _build_plants(layout: Dictionary) -> void:
@@ -35,20 +76,37 @@ func _build_plants(layout: Dictionary) -> void:
 
 	var small: Array = layout.get("small", [])
 	var cards: Array = layout.get("cards", [])
-	for plant_name in layout.plants:
+	var ps1: Array = layout.get("ps1", [])
+	var grow: Array = layout.get("grow_with_distance", [])
+	# Hand-placed plants plus the generated forest belt and grass.
+	var all_plants := {}
+	for src in [layout.get("plants", {}), layout.get("extra_plants", {})]:
+		for plant_name in src:
+			if not all_plants.has(plant_name):
+				all_plants[plant_name] = []
+			all_plants[plant_name].append_array(src[plant_name])
+
+	for plant_name in all_plants:
 		var mesh: Mesh = meshes.get(plant_name)
 		if mesh == null:
 			push_warning("Barangay: no mesh for plant %s" % plant_name)
 			continue
-		var entries: Array = layout.plants[plant_name]
+		if plant_name in ps1:
+			mesh = _ps1_mesh(mesh)
+		var entries: Array = all_plants[plant_name]
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.mesh = mesh
 		mm.instance_count = entries.size()
+		var grows: bool = plant_name in grow
 		for i in entries.size():
 			var e: Dictionary = entries[i]
 			var p: Array = e.p
-			var b := Basis(Vector3.UP, float(e.ry)).scaled(Vector3.ONE * float(e.s))
+			var s := float(e.s)
+			if grows:
+				var d := Vector2(p[0], p[2]).distance_to(COURT_CENTRE)
+				s *= clampf(1.0 + (d - tree_growth_start) * tree_growth_per_metre, 1.0, tree_growth_max)
+			var b := Basis(Vector3.UP, float(e.ry)).scaled(Vector3.ONE * s)
 			mm.set_instance_transform(i, Transform3D(b, Vector3(p[0], p[1], p[2])))
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = plant_name
@@ -62,6 +120,30 @@ func _build_plants(layout: Dictionary) -> void:
 		if plant_name in cards:
 			mmi.material_override = _card_material(mesh)
 		add_child(mmi)
+
+
+## PS1 look for the trees and spiky grass: blocky (nearest) texture filtering,
+## cut-out leaves seen from both sides.
+func _ps1_mesh(src: Mesh) -> Mesh:
+	var mesh := src.duplicate() as Mesh
+	for i in mesh.get_surface_count():
+		var m0 := mesh.surface_get_material(i) as StandardMaterial3D
+		if m0 == null:
+			continue
+		var m := m0.duplicate() as StandardMaterial3D
+		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+		m.roughness = 1.0
+		m.metallic_specular = 0.1
+		var n := m.resource_name.to_lower()
+		if "leaf" in n or "frond" in n:
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+			m.alpha_scissor_threshold = 0.5
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		elif "grass" in n:
+			m.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mesh.surface_set_material(i, m)
+	return mesh
 
 
 ## Grass/fern cards: cut-out alpha (cheap, no sorting), visible from both sides.
@@ -89,4 +171,6 @@ func _build_colliders(boxes: Array) -> void:
 		cs.name = b.name
 		cs.shape = shape
 		cs.position = Vector3(b.center[0], b.center[1], b.center[2])
+		if b.has("ry"):  # houses are turned at all sorts of angles
+			cs.rotation.y = float(b.ry)
 		body.add_child(cs)

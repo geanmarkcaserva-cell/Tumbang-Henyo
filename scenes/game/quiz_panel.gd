@@ -51,6 +51,7 @@ func show_result(chosen: int, correct: int, explanation: String) -> void:
 	if chosen >= 0 and chosen != correct:
 		_buttons[chosen].modulate = COLOR_WRONG
 	_buttons[correct].modulate = COLOR_RIGHT
+	Sfx.play("correct" if chosen == correct else "wrong")
 	if chosen == correct:
 		_feedback.text = "Tama!"
 	elif chosen < 0:

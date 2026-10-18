@@ -40,6 +40,14 @@ func _ready() -> void:
 	_throw_ui.visible = false
 	$Margin/VBox/Hint.text = "Quiz: click or 1/2/3   |   Throw: mouse aim, hold click to charge, release   |   Run: WASD, hold Shift to sprint (uses Energy), Space jump, Q look back   |   Esc pause"
 	$Margin/VBox/StaminaLabel.text = "Energy"
+	# Captions and big text in the title font; the controls hint stays plain.
+	for l in [_status, _round_label, _awra_label, $Margin/VBox/StaminaLabel, _wind_label]:
+		UiKit.use_title_font(l)
+	# The bubble letters are thin: small captions get a dark outline and a bit more size.
+	for l: Label in [_round_label, _awra_label, $Margin/VBox/StaminaLabel, _wind_label]:
+		l.add_theme_color_override("font_outline_color", UiKit.TEXT_OUTLINE)
+		l.add_theme_constant_override("outline_size", 8)
+		l.add_theme_font_size_override("font_size", l.get_theme_font_size("font_size") + 6)
 	_build_score_labels()
 	_pause_panel = _build_pause_panel()
 	_over_panel = _build_game_over_panel()
@@ -167,13 +175,12 @@ func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: 
 func _build_score_labels() -> void:
 	_score_label = _corner_label(95, 40)
 	_caps_label = _corner_label(150, 36)
-	_caps_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.35))
 	set_score(0)
 	set_caps(0)
 
 
 func _corner_label(top: float, font_size: int) -> Label:
-	var l := UiKit.label("", font_size, Color.WHITE, 8)
+	var l := UiKit.title("", font_size, Color.WHITE, 8)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	l.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	l.offset_left = -480.0
@@ -258,7 +265,7 @@ func _center_panel(root: Control, heading: String) -> VBoxContainer:
 	v.add_theme_constant_override("separation", 28)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(v)
-	var title := UiKit.label(heading, 84, Color.WHITE, 14)
+	var title := UiKit.title(heading, 88, Color.WHITE, 14)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
 	return v

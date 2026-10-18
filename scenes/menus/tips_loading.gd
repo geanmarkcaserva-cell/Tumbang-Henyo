@@ -98,13 +98,13 @@ func _build_skyline() -> void:
 
 
 func _build_text() -> void:
-	var tips := UiKit.label("Tips.", 96, Color.WHITE, 10)
+	var tips := UiKit.title("Tips.", 100, Color.WHITE, 12)
 	tips.position = Vector2(240, 270)
 	add_child(tips)
 
 	var fact := QuizDatabase.random_tip(GameManager.selected_theme)
 	var use_fact := fact != "" and randf() < 0.6
-	var header := UiKit.label("Did you know?" if use_fact else "Tip:", 44, Color.WHITE, 6)
+	var header := UiKit.title("Did you know?" if use_fact else "Tip:", 48, Color.WHITE, 8)
 	header.position = Vector2(420, 400)
 	add_child(header)
 
@@ -114,7 +114,7 @@ func _build_text() -> void:
 	body.size = Vector2(1150, 200)
 	add_child(body)
 
-	_loading = UiKit.label("Loading", 52, Color.WHITE, 8)
+	_loading = UiKit.title("Loading", 56, Color.WHITE, 10)
 	_loading.position = Vector2(870, 905)
 	add_child(_loading)
 

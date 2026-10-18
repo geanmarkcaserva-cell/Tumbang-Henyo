@@ -10,6 +10,34 @@ const BUTTON_GOLD := preload("res://art/ui/button_gold.png")
 const LOGO := preload("res://art/ui/logo.png")
 ## Size of the button art's frame (border + bevel) in pixels; the middle stretches.
 const BUTTON_SLICE := 20
+## Hand-drawn bubble font for titles, buttons and captions, always in white
+## (Hr Clunky, rebuilt by art/source/fonts/make_title_font.py: letters enlarged,
+## the wide gaps tightened and the hollow outlines filled in solid). It has
+## letters and basic punctuation only, so digits and other symbols fall back to
+## the default font. Descriptions keep the default font.
+const TITLE_FONT_PATH := "res://art/ui/fonts/HrClunky-Tight.ttf"
+static var _title_font: Font
+
+
+static func title_font() -> Font:
+	if _title_font == null:
+		var f: FontFile = load(TITLE_FONT_PATH)
+		if f.fallbacks.is_empty():
+			f.fallbacks = [ThemeDB.fallback_font] # digits, %, <, >, -
+		_title_font = f
+	return _title_font
+
+
+## Use the title font on any Control (Label, Button, ...).
+static func use_title_font(c: Control) -> void:
+	c.add_theme_font_override("font", title_font())
+
+
+## A label in the title font (headings, captions, big status text).
+static func title(text: String, font_size: int = 56, color: Color = Color.WHITE, outline: int = 10) -> Label:
+	var l := label(text, font_size, color, outline)
+	use_title_font(l)
+	return l
 
 const BLUE := Color(0.43, 0.73, 0.86)
 const CYAN := Color(0.69, 0.91, 0.93)
@@ -45,6 +73,7 @@ static func button(text: String, fill: Color = BLUE, font_size: int = 56, min_si
 	b.add_theme_constant_override("outline_size", 10)
 	set_fill(b, fill, false)
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	use_title_font(b)
 	UiFx.hookup_button(b) # bouncy hover / press
 	return b
 

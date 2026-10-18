@@ -184,6 +184,7 @@ func _build_preview() -> void:
 	shadow.material_override = mat
 	shadow.scale = Vector3(1.3, 1.0, 0.8)
 	shadow.position = Vector3(0.15, 0.04, -0.1)
+	shadow.add_to_group("blob_shadow") # only in low detail mode (Settings)
 	stand.add_child(shadow)
 	_set_char_preview(Economy.find_item("character", Economy.equipped_character))
 
@@ -270,7 +271,7 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
 
-	var title := UiKit.label("Choose gamemode", 72, Color.WHITE, 16)
+	var title := UiKit.title("Choose gamemode", 76, Color.WHITE, 16)
 	title.position = Vector2(30, 10)
 	root.add_child(title)
 
@@ -304,7 +305,7 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	board.add_child(v)
-	_board_title = UiKit.label("Leaderboards", 60, Color.WHITE, 0)
+	_board_title = UiKit.title("Leaderboards", 60, Color.WHITE, 8)
 	v.add_child(_board_title)
 	v.add_child(HSeparator.new())
 	var rank_colors := [Color(1.0, 0.85, 0.35), Color(0.85, 0.85, 0.9), Color(0.85, 0.7, 0.75)]
@@ -357,7 +358,7 @@ func _fill_board(theme_id: String) -> void:
 func _build_custom(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
-	var title := UiKit.label("Custom quiz", 72, Color.WHITE, 16)
+	var title := UiKit.title("Custom quiz", 76, Color.WHITE, 16)
 	title.position = Vector2(30, 10)
 	root.add_child(title)
 
@@ -657,11 +658,11 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 		_slipper_icon.set_meta("fx_skip", true) # positioned and spun every frame in _process
 		root.add_child(_slipper_icon)
 
-	var title := UiKit.label(heading, 72, Color.WHITE, 16)
+	var title := UiKit.title(heading, 76, Color.WHITE, 16)
 	title.position = Vector2(90, 50)
 	root.add_child(title)
 
-	p.caps = UiKit.label("", 44, Color(1.0, 0.86, 0.35), 10)
+	p.caps = UiKit.title("", 46, Color.WHITE, 10)
 	p.caps.position = Vector2(1440, 60)
 	root.add_child(p.caps)
 
@@ -673,15 +674,15 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 18)
 	panel.add_child(v)
-	p.name = UiKit.label("", 80, Color.WHITE, 12)
+	p.name = UiKit.title("", 84, Color.WHITE, 12)
 	v.add_child(p.name)
-	v.add_child(UiKit.label("- " + ("Character" if kind == "character" else "Weapon") + " description", 40, Color.WHITE, 10))
+	v.add_child(UiKit.title(("Character" if kind == "character" else "Weapon") + " description", 40, Color.WHITE, 8))
 	p.desc = UiKit.label("", 34, Color.WHITE, 6)
 	p.desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	p.desc.custom_minimum_size = Vector2(560, 0)
 	p.desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(p.desc)
-	p.status = UiKit.label("", 36, Color(1.0, 0.86, 0.35), 8)
+	p.status = UiKit.title("", 40, Color.WHITE, 8)
 	v.add_child(p.status)
 	p.buy = UiKit.button("BUY", UiKit.GOLD, 40, Vector2(400, 100))
 	p.buy.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -817,7 +818,7 @@ func _build_simple(ui: CanvasLayer, heading: String, body: String) -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 30)
 	panel.add_child(v)
-	v.add_child(UiKit.label(heading, 72, Color.WHITE, 12))
+	v.add_child(UiKit.title(heading, 76, Color.WHITE, 12))
 	var text := UiKit.label(body, 36)
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.size_flags_vertical = Control.SIZE_EXPAND_FILL

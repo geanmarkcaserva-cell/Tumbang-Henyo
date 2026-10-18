@@ -6,6 +6,8 @@ extends Node
 ## "Master"); the Music and Sfx autoloads play on them.
 ## Low detail mode: no sun shadows, 3D drawn at 75% resolution, and nodes in
 ## the "detail_heavy" group (grass, small plants, far-off houses) hidden.
+## Nodes in the "blob_shadow" group (round shadows under characters) show only
+## in low detail mode, since the sun draws real shadows otherwise.
 
 signal changed
 
@@ -113,6 +115,9 @@ func _apply_detail() -> void:
 	for n in get_tree().get_nodes_in_group("detail_heavy"):
 		if n is Node3D:
 			n.visible = not low_detail
+	for n in get_tree().get_nodes_in_group("blob_shadow"):
+		if n is Node3D:
+			n.visible = low_detail
 	for light in get_tree().root.find_children("*", "DirectionalLight3D", true, false):
 		_apply_light(light)
 	changed.emit()
@@ -126,6 +131,11 @@ func _apply_light(light: DirectionalLight3D) -> void:
 
 ## New scenes come in with full detail; trim them as they load.
 func _on_node_added(n: Node) -> void:
+	# Round blob shadows under characters stand in for the sun's shadows,
+	# so they only show in low detail mode.
+	if n is Node3D and n.is_in_group("blob_shadow"):
+		n.visible = low_detail
+		return
 	if not low_detail:
 		return
 	if n is DirectionalLight3D:

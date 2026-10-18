@@ -39,7 +39,7 @@ func _ready() -> void:
 	_explainer.position = Vector2(40, 1000)
 	add_child(_explainer)
 
-	_loading = UiKit.label("Loading", 44)
+	_loading = UiKit.title("Loading", 48, Color.WHITE, 0)
 	_loading.position = Vector2(1640, 990)
 	add_child(_loading)
 

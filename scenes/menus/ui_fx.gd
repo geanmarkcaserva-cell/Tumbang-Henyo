@@ -110,8 +110,13 @@ static func pop(c: Control, delay: float = 0.0, from: float = 0.55, duration: fl
 	var base := base_of(c)
 	c.scale = base * from
 	c.modulate.a = 0.0
-	var t := _new_tween(c).set_parallel(true)
-	t.tween_property(c, "modulate:a", 1.0, duration * 0.4).set_delay(delay)
+	# The fade has its own tween: a hover or tap during the pop replaces the
+	# scale tween, and must never leave the piece stuck half see-through.
+	_kill_meta_tween(c, "fx_fade")
+	var f := c.create_tween()
+	c.set_meta("fx_fade", f)
+	f.tween_property(c, "modulate:a", 1.0, duration * 0.4).set_delay(delay)
+	var t := _new_tween(c)
 	t.tween_property(c, "scale", base, duration).set_delay(delay) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
@@ -158,8 +163,20 @@ static func _list_items(c: Control) -> Array[Control]:
 	return out
 
 
+## If a fade-in is no longer running (killed, or the piece was hidden mid-way),
+## make sure the piece ends up fully visible.
+static func _ensure_opaque(c: CanvasItem) -> void:
+	var fading := false
+	if c.has_meta("fx_fade"):
+		var f: Tween = c.get_meta("fx_fade")
+		fading = f != null and f.is_valid() and f.is_running()
+	if not fading:
+		c.modulate.a = 1.0
+
+
 ## A quick punch: grows to `amount` and springs back (score ticks, "Tama!").
 static func bounce(c: Control, amount: float = 1.18, duration: float = 0.5) -> void:
+	_ensure_opaque(c)
 	_centre_pivot(c)
 	var base := base_of(c)
 	var t := _new_tween(c)
@@ -229,5 +246,6 @@ static func hookup_button(b: BaseButton) -> void:
 
 
 static func _spring(c: Control, mult: float, duration: float, trans: Tween.TransitionType) -> void:
+	_ensure_opaque(c)
 	var t := _new_tween(c)
 	t.tween_property(c, "scale", base_of(c) * mult, duration).set_trans(trans).set_ease(Tween.EASE_OUT)

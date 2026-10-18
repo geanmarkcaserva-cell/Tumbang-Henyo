@@ -279,6 +279,7 @@ func _on_quiz_timed_out() -> void:
 
 func _answer_failed() -> void:
 	_hud.show_status("")
+	_player.hurt() # squish + red flash
 	_lose_awra(AWRA_WRONG)
 	if state == State.GAME_OVER:
 		return

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bmr6t7h0j7vth"]
 
-[ext_resource type="PackedScene" path="res://scenes/game/lata.tscn" id="1_lata"]
+[ext_resource type="PackedScene" uid="uid://dbat1l8e3cukb" path="res://scenes/game/lata.tscn" id="1_lata"]
 [ext_resource type="PackedScene" uid="uid://dpfhfced1ewv" path="res://scenes/game/taya.tscn" id="2_c0blr"]
 [ext_resource type="PackedScene" uid="uid://fhbyva8xserg" path="res://art/sk_court/sk_court.glb" id="3_lfxt1"]
 [ext_resource type="Script" uid="uid://bldi3oabof056" path="res://scenes/arenas/barangay.gd" id="4_qrx6g"]
@@ -76,7 +76,10 @@ transform = Transform3D(-0.62817365, 0.22993636, -0.7433217, 0, 0.9553365, 0.295
 light_color = Color(1, 0.66, 0.42, 1)
 light_energy = 1.6
 shadow_enabled = true
-directional_shadow_max_distance = 70.0
+shadow_blur = 1.5
+directional_shadow_mode = 0
+directional_shadow_fade_start = 0.7
+directional_shadow_max_distance = 60.0
 
 [node name="Geometry" type="Node3D" parent="." unique_id=1913206090]
 

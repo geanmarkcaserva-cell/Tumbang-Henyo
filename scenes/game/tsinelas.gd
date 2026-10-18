@@ -28,6 +28,7 @@ var _time := 0.0
 var _still_time := 0.0
 var _done := false
 var _has_hit := false
+var _hurt_bodies: Array[Node3D] = [] ## tayas this throw already hit
 
 ## Trail: the arc the tsinelas has flown, drawn as a fading ribbon.
 const TRAIL_MAX_POINTS := 90
@@ -225,6 +226,11 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_hit_zone_body_entered(body: Node3D) -> void:
+	# The player's throw caught a taya on the way: it reacts (squish, red flash).
+	if target_group == "lata" and body.is_in_group("taya") and not _hurt_bodies.has(body) \
+			and linear_velocity.length() >= MIN_HIT_SPEED and body.has_method("hurt"):
+		_hurt_bodies.append(body)
+		body.hurt()
 	if _has_hit or not body.is_in_group(target_group):
 		return
 	if linear_velocity.length() < MIN_HIT_SPEED:

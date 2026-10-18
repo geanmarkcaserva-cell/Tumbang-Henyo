@@ -18,7 +18,7 @@ func _init() -> void:
 	v.add_theme_constant_override("separation", 22)
 	add_child(v)
 
-	var title := UiKit.label("Settings", 72, Color.WHITE, 12)
+	var title := UiKit.title("Settings", 76, Color.WHITE, 12)
 	v.add_child(title)
 
 	v.add_child(_slider_row("Volume", Settings.volume, Settings.set_volume))
@@ -47,7 +47,7 @@ func refresh() -> void:
 func _slider_row(text: String, value: float, setter: Callable, preview_sfx: bool = false) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
-	var name_label := UiKit.label(text, 38, Color.WHITE, 6)
+	var name_label := UiKit.title(text, 42, Color.WHITE, 8)
 	name_label.custom_minimum_size = Vector2(250, 0)
 	row.add_child(name_label)
 	var slider := HSlider.new()
@@ -76,7 +76,7 @@ func _toggle_row(text: String, key: String, on: bool, setter: Callable, hint: St
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
 	box.add_child(row)
-	var name_label := UiKit.label(text, 38, Color.WHITE, 6)
+	var name_label := UiKit.title(text, 42, Color.WHITE, 8)
 	name_label.custom_minimum_size = Vector2(450, 0)
 	row.add_child(name_label)
 	var b := UiKit.button("", UiKit.BLUE, 34, Vector2(180, 76))

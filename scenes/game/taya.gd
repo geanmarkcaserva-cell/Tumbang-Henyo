@@ -175,6 +175,12 @@ func start_chase() -> void:
 		state = State.CHASE
 
 
+## Hit by the player's tsinelas during the throw: squish and flash red.
+## (Only a reaction; it doesn't change what the taya does.)
+func hurt() -> void:
+	$PaperDoll.hurt()
+
+
 func stop() -> void:
 	state = State.IDLE
 	_halt()

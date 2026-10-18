@@ -72,6 +72,12 @@ func stagger(duration: float, push: Vector3) -> void:
 	_stagger_time = duration
 	velocity.x = push.x
 	velocity.z = push.z
+	hurt()
+
+
+## Damage feedback (wrong answer, tsinelas hit): squish and flash red.
+func hurt() -> void:
+	$PaperDoll.hurt()
 
 
 ## Put the player back at a spawn point, facing down the court.

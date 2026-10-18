@@ -22,6 +22,7 @@ var _active := false
 
 func _ready() -> void:
 	visible = false
+	UiKit.use_title_font($Panel/HBox/Left/Header) # "QUESTION:" caption
 	for i in _buttons.size():
 		_buttons[i].pressed.connect(_choose.bind(i))
 		UiFx.hookup_button(_buttons[i])

@@ -129,14 +129,10 @@ func _wind_max_for_round() -> float:
 	return 6.0
 
 
+## How much of the aim line to show. The design used to shorten it in later
+## rounds (to 0 from round 10); now the full line and landing circle always show.
 func _preview_for_round() -> float:
-	if round_number <= 2:
-		return 1.0
-	elif round_number <= 5:
-		return 0.5
-	elif round_number <= 9:
-		return 0.25
-	return 0.0
+	return 1.0
 
 
 func _taya_reaction_time() -> float: ## seconds between the taya's looks at you
@@ -364,8 +360,13 @@ func _enter_run() -> void:
 	for t in _tayas:
 		t.configure(_player.walk_speed * TAYA_SPEED_RATIO, _lata_reset_time(),
 				_taya_reaction_time(), _taya_aim_error())
-	# The nearest taya stands the lata up; the rest wait, then everyone chases.
-	_nearest_taya_to_lata().start_reset()
+	# The nearest taya stands the lata up; every other taya goes after the
+	# player straight away (the resetter joins once the lata is up).
+	var resetter := _nearest_taya_to_lata()
+	resetter.start_reset()
+	for t in _tayas:
+		if t != resetter:
+			t.start_chase()
 
 
 func _on_taya_lata_reset() -> void:

@@ -85,6 +85,9 @@ var _seen_pos := Vector3.ZERO ## where it last saw the player
 var _seen_vel := Vector3.ZERO ## which way the player was moving then
 var _look_timer := 0.0
 
+var _alert: Label3D ## the "!" over its head while it winds up a throw
+var _alert_time := 0.0
+
 @onready var _ring: MeshInstance3D = $WarningRing
 
 
@@ -101,6 +104,35 @@ func _ready() -> void:
 	_move_dir = _flat(-global_basis.z).normalized()
 	_ring.top_level = true
 	_ring.visible = false
+	_alert = Label3D.new()
+	_alert.text = "!"
+	_alert.font_size = 160
+	_alert.outline_size = 36
+	_alert.pixel_size = 0.0045
+	_alert.modulate = Color(1.0, 0.85, 0.1)
+	_alert.outline_modulate = Color(0.55, 0.0, 0.0)
+	_alert.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_alert.no_depth_test = true
+	_alert.fixed_size = false
+	_alert.render_priority = 20
+	_alert.outline_render_priority = 19
+	_alert.position = Vector3(0.0, 2.45, 0.0)
+	_alert.visible = false
+	add_child(_alert)
+
+
+func _process(delta: float) -> void:
+	# The "!" pops in, then pulses until the tsinelas leaves the hand.
+	if _alert.visible:
+		_alert_time += delta
+		var pop := minf(_alert_time / 0.12, 1.0)
+		var pulse := 1.0 + 0.12 * sin(_alert_time * 28.0)
+		_alert.scale = Vector3.ONE * (0.3 + 0.9 * pop) * pulse
+
+
+func _show_alert(on: bool) -> void:
+	_alert.visible = on
+	_alert_time = 0.0
 
 
 func setup(player: CharacterBody3D, lata: RigidBody3D) -> void:
@@ -126,6 +158,7 @@ func return_to_guard() -> void:
 	_lunge_cd = 0.0
 	_move_dir = _flat(-global_basis.z).normalized()
 	_ring.visible = false
+	_show_alert(false)
 	state = State.GUARD
 
 
@@ -146,6 +179,7 @@ func stop() -> void:
 	state = State.IDLE
 	_halt()
 	_ring.visible = false
+	_show_alert(false)
 
 
 func _physics_process(delta: float) -> void:
@@ -320,9 +354,11 @@ func _start_wind_up(distance: float) -> void:
 	_throw_target = _seen_pos + lead + scatter + Vector3(0.0, 0.03, 0.0)
 	_ring.global_position = _throw_target
 	_ring.visible = true
+	_show_alert(true)
 
 
 func _throw() -> void:
+	_show_alert(false)
 	var origin := global_transform * Vector3(0.35, 1.45, -0.35)
 	var flight_time := _flight_time(origin.distance_to(_throw_target))
 	if elite:

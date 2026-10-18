@@ -45,22 +45,41 @@ const CHARACTERS := [
 			"accent": Color(1.0, 0.4, 0.6), "pants": Color(0.95, 0.95, 0.95), "feet": Color(1.0, 0.8, 0.25)}},
 ]
 
+## Every slipper is a hand-drawn sprite in art/Slippers ("icon"), shown as-is
+## in weapon select. "palette" colours the 3D tsinelas in-game, picked from
+## the sprite's mid tones (the 3D view is lit and tone-mapped, so the art's
+## darkest colours would come out near black). "enchanted" adds the
+## Minecraft-style purple glint (see Enchant). Items without an icon fall back
+## to a generated placeholder.
 const SLIPPERS := [
 	{"id": "goma", "name": "Blue na Tsinelas", "price": 0,
-		"desc": "Ang klasikong goma. Asul at puti, laging maaasahan.",
-		"palette": {"sole": Color(0.25, 0.4, 0.92), "strap": Color(0.95, 0.95, 0.95)}},
+		"desc": "Ang klasikong goma. Asul, laging maaasahan.",
+		"icon": "res://art/Slippers/Blue.png",
+		"palette": {"sole": Color("374ac0"), "strap": Color("942d73")}},
 	{"id": "bakya", "name": "Bakya", "price": 250,
-		"desc": "Kahoy na bakya na may pinturang disenyo. Maingay kapag tumama.",
-		"palette": {"sole": Color(0.6, 0.4, 0.22), "strap": Color(0.85, 0.2, 0.2)}},
-	{"id": "pambahay", "name": "Pambahay", "price": 250,
-		"desc": "Malambot na pink na tsinelas pambahay.",
-		"palette": {"sole": Color(1.0, 0.65, 0.78), "strap": Color(1.0, 1.0, 1.0)}},
-	{"id": "simbahan", "name": "Pang-Simbahan", "price": 400,
-		"desc": "Makintab na sandalyas pang-Linggo.",
-		"palette": {"sole": Color(0.14, 0.13, 0.14), "strap": Color(0.5, 0.3, 0.16)}},
-	{"id": "ginto", "name": "Gintong Tsinelas", "price": 1500,
-		"desc": "Ginto. Pang-flex lang, pareho pa rin ang tama.",
-		"palette": {"sole": Color(1.0, 0.8, 0.25), "strap": Color(1.0, 0.97, 0.85)}},
+		"desc": "Kahoy na bakya. Maingay kapag tumama.",
+		"icon": "res://art/Slippers/Bakya.png",
+		"palette": {"sole": Color("734724"), "strap": Color("5a2f0c")}},
+	{"id": "purto", "name": "Purto", "price": 250,
+		"desc": "Kulay-krema na may ube na tali. Pambahay pero pang-laban.",
+		"icon": "res://art/Slippers/Purto.png",
+		"palette": {"sole": Color("ddcda5"), "strap": Color("886dec")}},
+	{"id": "aylander", "name": "Aylander", "price": 300,
+		"desc": "Ang paboritong goma ng buong barangay. Itim, matibay, hindi napipigtas.",
+		"icon": "res://art/Slippers/Aylander.png",
+		"palette": {"sole": Color("4b445b"), "strap": Color("615663")}},
+	{"id": "rabit", "name": "Rabit", "price": 350,
+		"desc": "Pink at malambot. Paborito ng mga ate sa kanto.",
+		"icon": "res://art/Slippers/Rabit.png",
+		"palette": {"sole": Color("e5c9dc"), "strap": Color("a56991")}},
+	{"id": "kroks", "name": "Kroks", "price": 600,
+		"desc": "Berde, butas-butas, at pang-sosyal sa kanto.",
+		"icon": "res://art/Slippers/kroks.png",
+		"palette": {"sole": Color("99e550"), "strap": Color("3c911c")}},
+	{"id": "enchanted", "name": "Tsinelas na Enchanted", "price": 2000,
+		"desc": "Kumikinang sa mahika. Pareho pa rin ang tama, pero iba ang dating.",
+		"icon": "res://art/Slippers/Tsinelas na Enchanted.png", "enchanted": true,
+		"palette": {"sole": Color("2d2878"), "strap": Color("5fcde4")}},
 ]
 
 var caps := STARTER_CAPS
@@ -131,6 +150,10 @@ func find_item(kind: String, item_id: String) -> Dictionary:
 
 func slipper_palette() -> Dictionary:
 	return find_item("slipper", equipped_slipper).palette
+
+
+func equipped_slipper_item() -> Dictionary:
+	return find_item("slipper", equipped_slipper)
 
 
 func save_profile() -> void:

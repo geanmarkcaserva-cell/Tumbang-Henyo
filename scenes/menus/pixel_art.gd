@@ -154,6 +154,15 @@ static func slipper(p: Dictionary) -> ImageTexture:
 	return ImageTexture.create_from_image(_image(SLIPPER, {"S": p.sole, "D": p.sole.darkened(0.3), "T": p.strap}))
 
 
+## A catalog slipper's picture: its hand-drawn icon from art/Slippers when
+## it has one, otherwise the generated placeholder from its palette.
+static func slipper_texture(item: Dictionary) -> Texture2D:
+	var icon: String = item.get("icon", "")
+	if icon != "" and ResourceLoader.exists(icon):
+		return load(icon)
+	return slipper(item.palette)
+
+
 static func _person(rows: Array, p: Dictionary) -> ImageTexture:
 	var img := _image(rows, {
 		"H": p.hair, "S": p.skin, "L": p.skin,

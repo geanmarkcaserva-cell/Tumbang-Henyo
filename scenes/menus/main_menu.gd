@@ -27,7 +27,6 @@ const BACK_OF := {
 const CHARACTER_PIXEL := 0.08 ## metres per pixel: 22 px tall -> 1.76 m
 ## Lens for shots that don't set their own "fov".
 const DEFAULT_FOV := 70.0
-const SLIPPER_PIXEL := 0.045
 
 var cam_pos := Vector3.ZERO
 var cam_look := Vector3.ZERO
@@ -59,7 +58,12 @@ var _ai_dialog: AcceptDialog
 var _char_state := "idle"
 var _char_state_since := 0.0
 var _char_happy_left := 0.0
-var _slipper_sprite: Sprite3D
+## The slipper in weapon select is drawn in 2D (over the court) so its
+## pixel art keeps its exact colours; the 3D view's tone mapping would
+## darken and wash it out.
+var _slipper_icon: TextureRect
+const SLIPPER_ICON_SCALE := 14.0 ## screen pixels per art pixel
+const SLIPPER_ICON_CENTER := Vector2(1500, 560)
 
 @onready var _camera: Camera3D = $Camera3D
 
@@ -90,8 +94,9 @@ func _process(delta: float) -> void:
 	_camera.global_position = cam_pos + sway
 	_camera.look_at(cam_look, Vector3.UP)
 	# The tsinelas floats and wobbles beside the character.
-	_slipper_sprite.position.y = 0.78 + sin(_time * 2.4) * 0.04
-	_slipper_sprite.rotation.z = deg_to_rad(-28.0 + sin(_time * 1.7) * 6.0)
+	if _slipper_icon:
+		_slipper_icon.position.y = SLIPPER_ICON_CENTER.y - _slipper_icon.size.y * 0.5 + sin(_time * 2.4) * 10.0
+		_slipper_icon.rotation = deg_to_rad(-28.0 + sin(_time * 1.7) * 6.0)
 	_camera.fov = cam_fov
 	# The character on the stand loops idle, or happy for a moment after a pick.
 	if _char_happy_left > 0.0:
@@ -128,7 +133,6 @@ func _show(panel_id: String, instant: bool = false) -> void:
 		_enter_custom()
 	for key in _panels:
 		_panels[key].visible = key == panel_id
-	_slipper_sprite.visible = panel_id == "weapon"
 	if _pickers.has(panel_id):
 		_open_picker(panel_id)
 	var shot: Dictionary = SHOTS[panel_id]
@@ -171,11 +175,18 @@ func _build_preview() -> void:
 	shadow.scale = Vector3(1.3, 1.0, 0.8)
 	shadow.position = Vector3(0.15, 0.04, -0.1)
 	stand.add_child(shadow)
-	_slipper_sprite = _pixel_sprite(SLIPPER_PIXEL)
-	_slipper_sprite.position = Vector3(0.45, 0.78, 0.35)
-	stand.add_child(_slipper_sprite)
 	_set_char_preview(Economy.find_item("character", Economy.equipped_character))
-	_slipper_sprite.texture = PixelArt.slipper(Economy.slipper_palette())
+
+
+## Show a slipper floating beside the character in weapon select, in its
+## exact colours, with the enchantment glint when it has one.
+func _set_slipper_preview(item: Dictionary) -> void:
+	var tex := PixelArt.slipper_texture(item)
+	_slipper_icon.texture = tex
+	_slipper_icon.size = Vector2(tex.get_size()) * SLIPPER_ICON_SCALE
+	_slipper_icon.pivot_offset = _slipper_icon.size * 0.5
+	_slipper_icon.position = SLIPPER_ICON_CENTER - _slipper_icon.size * 0.5
+	Enchant.apply_to_canvas(_slipper_icon, Enchant.is_enchanted(item))
 
 
 ## Show a character on the stand: its front sheet (animated if it has frames),
@@ -625,6 +636,13 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 	var root := UiKit.full_rect()
 	ui.add_child(root)
 	var p := {"items": Economy.catalog("character" if kind == "character" else "slipper"), "index": 0, "confirm": false}
+	if kind != "character":
+		_slipper_icon = TextureRect.new()
+		_slipper_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_slipper_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_slipper_icon.stretch_mode = TextureRect.STRETCH_SCALE
+		_slipper_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(_slipper_icon)
 
 	var title := UiKit.label(heading, 72, Color.WHITE, 16)
 	title.position = Vector2(90, 50)
@@ -722,8 +740,8 @@ func _refresh_picker(kind: String) -> void:
 		_set_char_preview(item)
 		_char_sprite.modulate = tint
 	else:
-		_slipper_sprite.texture = PixelArt.slipper(item.palette)
-		_slipper_sprite.modulate = tint
+		_set_slipper_preview(item)
+		_slipper_icon.modulate = tint
 
 
 func _on_buy(kind: String) -> void:

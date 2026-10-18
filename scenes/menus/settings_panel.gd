@@ -20,6 +20,7 @@ func _init() -> void:
 
 	var title := UiKit.title("Settings", 76, Color.WHITE, 12)
 	v.add_child(title)
+	v.add_child(UiKit.accent_rule())
 
 	v.add_child(_slider_row("Volume", Settings.volume, Settings.set_volume))
 	v.add_child(_slider_row("Music", Settings.music, Settings.set_music))
@@ -31,7 +32,7 @@ func _init() -> void:
 		v.add_child(_toggle_row("Fullscreen", "full", Settings.fullscreen,
 				func(on: bool): Settings.set_fullscreen(on)))
 
-	var back := UiKit.button("< BACK", UiKit.BLUE, 40, Vector2(240, 96))
+	var back := UiKit.button("Back", UiKit.BLUE, 40, Vector2(240, 96))
 	back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	back.pressed.connect(func(): back_pressed.emit())
 	v.add_child(back)
@@ -95,7 +96,7 @@ func _toggle_row(text: String, key: String, on: bool, setter: Callable, hint: St
 
 func _set_toggle(b: Button, on: bool) -> void:
 	b.set_meta("on", on)
-	b.text = "ON" if on else "OFF"
+	b.text = "On" if on else "Off"
 	UiKit.set_fill(b, UiKit.GOLD if on else UiKit.BLUE, false)
 
 

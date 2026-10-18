@@ -22,10 +22,24 @@ var _active := false
 
 func _ready() -> void:
 	visible = false
-	UiKit.use_title_font($Panel/HBox/Left/Header) # "QUESTION:" caption
+	UiKit.use_title_font($Panel/HBox/Left/Header) # "Question" caption
+	$Panel/HBox/Left/Header.text = "Question"
+	$Panel/HBox/Left/Header.add_theme_color_override("font_color", UiKit.ACCENT)
+	$Panel.add_theme_stylebox_override("panel", UiKit.box())
+	_timer_bar.add_theme_stylebox_override("fill", _bar_box(UiKit.ACCENT))
+	_timer_bar.add_theme_stylebox_override("background", _bar_box(Color(1, 1, 1, 0.12)))
 	for i in _buttons.size():
 		_buttons[i].pressed.connect(_choose.bind(i))
+		UiKit.set_fill(_buttons[i], UiKit.BLUE, false) # glass answer cards (answers keep the plain font)
+		_buttons[i].add_theme_constant_override("shadow_offset_y", 2)
 		UiFx.hookup_button(_buttons[i])
+
+
+func _bar_box(colour: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = colour
+	s.set_corner_radius_all(6)
+	return s
 
 
 ## Seconds left when the player answered (for scoring later).

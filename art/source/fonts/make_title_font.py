@@ -1,6 +1,7 @@
 """Build art/ui/fonts/HrClunky-Tight.ttf from the original Hr Clunky (art/source/fonts):
    - letters 30% bigger for the same font size (the original draws them small),
    - the wide gaps between letters tightened,
+   - every letter put on one baseline, each kind of letter at one height,
    - hollow "bubble outline" letters filled in solid (only real counters, like the
      holes in O, B, e, stay open), so they read as white letters with one outline.
    python make_title_font.py HrClunky-Regular.otf HrClunky-Tight.ttf
@@ -47,6 +48,38 @@ for name in f.getGlyphOrder():
         allp += pts; allf += fl; new_ends.append(len(allp) - 1)
     g.coordinates = GlyphCoordinates(allp); g.flags = bytearray(allf)
     g.endPtsOfContours = new_ends; g.numberOfContours = len(new_ends)
+    g.recalcBounds(glyf)
+
+# 1b. line the letters up: every letter on one baseline, each kind at one height
+#     (capitals, small letters, tall small letters, letters with tails), so the
+#     handwriting keeps its wobble but the words sit straight.
+cmap = f.getBestCmap()
+def _h(ch): g = glyf[cmap[ord(ch)]]; return g.yMax - g.yMin
+CAP = sorted(_h(c) for c in "ABCDEFGHIKLMNOPRSTUVWXYZ")[12]          # median capital height
+XH = sorted(_h(c) for c in "acemnorsuvwxz")[6]                       # median small-letter height
+RULES = {}  # char -> (height, bottom)
+for c in "ABCDEFGHIJKLMNOPRSTUVWXYZ!?": RULES[c] = (CAP, 0)
+RULES["Q"] = (CAP * 1.12, -CAP * 0.12)
+for c in "acemnorsuvwxz": RULES[c] = (XH, 0)
+for c in "bdfhkl": RULES[c] = (CAP, 0)
+RULES["t"] = (CAP * 0.86, 0)
+RULES["i"] = (CAP * 0.92, 0)
+RULES["j"] = (CAP * 0.92 + XH * 0.4, -XH * 0.4)
+for c in "gpqy": RULES[c] = (XH * 1.42, -XH * 0.42)
+RULES["."] = (CAP * 0.24, 0)
+RULES[","] = (CAP * 0.4, -CAP * 0.14)
+RULES[":"] = (XH, 0)
+RULES[";"] = (XH * 1.14, -XH * 0.14)
+for ch, (height, bottom) in RULES.items():
+    name = cmap.get(ord(ch))
+    if not name: continue
+    g = glyf[name]
+    if g.numberOfContours <= 0 or g.isComposite(): continue
+    g.recalcBounds(glyf)
+    k = height / max(g.yMax - g.yMin, 1)
+    k = min(max(k, 0.72), 1.35)  # don't distort a letter too far
+    x0, y0 = g.xMin, g.yMin
+    g.coordinates = GlyphCoordinates([((x - x0) * k + x0, (y - y0) * k + bottom) for x, y in g.coordinates])
     g.recalcBounds(glyf)
 
 # 2. tighten the spacing

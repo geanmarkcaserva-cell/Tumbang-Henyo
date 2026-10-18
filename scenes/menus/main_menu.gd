@@ -78,9 +78,9 @@ func _ready() -> void:
 	_panels["main"] = _build_main(ui)
 	_panels["mode"] = _build_mode(ui)
 	_panels["custom"] = _build_custom(ui)
-	_panels["character"] = _build_picker(ui, "character", "Select character", "NEXT >",
+	_panels["character"] = _build_picker(ui, "character", "Select character", "Next",
 			func(): _confirm_pick("character", "weapon"))
-	_panels["weapon"] = _build_picker(ui, "weapon", "Select weapon...", "GO >",
+	_panels["weapon"] = _build_picker(ui, "weapon", "Select weapon", "Go!",
 			func(): _confirm_pick("weapon", ""))
 	_panels["settings"] = _build_settings(ui)
 	_panels["credits"] = _build_simple(ui, "Credits", "Tumbang Henyo\n\nGame design, art and code by the Tumbang Henyo team.")
@@ -248,18 +248,44 @@ func _build_main(ui: CanvasLayer) -> Control:
 	root.add_child(logo)
 	_logo = logo
 
+	# A soft dark fade from the right edge keeps the text readable over the bright court.
+	# (It runs past the layout's right edge so ultrawide screens get it right up to their edge.)
+	var fade_grad := Gradient.new()
+	fade_grad.set_color(0, Color(0, 0, 0, 0))
+	fade_grad.set_color(1, Color(0, 0, 0, 0.6))
+	fade_grad.add_point(0.47, Color(0, 0, 0, 0.52))
+	var fade_tex := GradientTexture2D.new()
+	fade_tex.gradient = fade_grad
+	fade_tex.fill_from = Vector2(0, 0)
+	fade_tex.fill_to = Vector2(1, 0)
+	var fade := TextureRect.new()
+	fade.texture = fade_tex
+	fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	fade.stretch_mode = TextureRect.STRETCH_SCALE
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
+	fade.offset_left = -900
+	fade.offset_right = 1000
+	fade.offset_top = -600 # also covers taller screens
+	fade.offset_bottom = 600
+	fade.set_meta("fx_skip", true)
+	root.add_child(fade)
+
+	# Plain text menu, right-aligned, no boxes: the court behind does the talking.
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 36)
-	col.position = Vector2(1280, 135)
+	col.add_theme_constant_override("separation", 4)
+	col.position = Vector2(1300, 300)
+	col.custom_minimum_size = Vector2(540, 0)
 	root.add_child(col)
 	var entries := [
-		["START", func(): _show("mode")],
-		["SETTINGS", func(): _show("settings")],
-		["CREDITS", func(): _show("credits")],
-		["QUIT", func(): Transition.quit()],
+		["Start", func(): _show("mode")],
+		["Settings", func(): _show("settings")],
+		["Credits", func(): _show("credits")],
+		["Quit", func(): Transition.quit()],
 	]
 	for e in entries:
-		var b := UiKit.button(e[0], UiKit.BLUE, 64, Vector2(540, 140))
+		var b := UiKit.text_button(e[0], 84)
+		b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		b.pressed.connect(e[1])
 		col.add_child(b)
 	return root
@@ -285,13 +311,13 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	list.custom_minimum_size = Vector2(720, 0)
 	scroll.add_child(list)
 	for t in GameManager.THEMES:
-		var b := UiKit.button(t.name.to_upper(), UiKit.CYAN, 72, Vector2(700, 160))
+		var b := UiKit.button(t.name, UiKit.CYAN, 64, Vector2(700, 150))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(_select_theme.bind(t.id))
 		list.add_child(b)
 		_theme_buttons[t.id] = b
 	# Player-made question sets.
-	var custom := UiKit.button("CUSTOM  +", UiKit.GOLD, 72, Vector2(700, 160))
+	var custom := UiKit.button("Custom +", UiKit.BLUE, 64, Vector2(700, 150))
 	custom.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	custom.pressed.connect(func(): _show("custom"))
 	list.add_child(custom)
@@ -305,7 +331,12 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	board.add_child(v)
-	_board_title = UiKit.title("Leaderboards", 60, Color.WHITE, 8)
+	v.add_child(UiKit.title("Leaderboards", 60, Color.WHITE, 8))
+	# The theme's name under the heading, in the accent colour (long names are cut).
+	_board_title = UiKit.title("", 46, UiKit.ACCENT, 6)
+	_board_title.clip_text = true
+	_board_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_board_title.custom_minimum_size = Vector2(860, 0)
 	v.add_child(_board_title)
 	v.add_child(HSeparator.new())
 	var rank_colors := [Color(1.0, 0.85, 0.35), Color(0.85, 0.85, 0.9), Color(0.85, 0.7, 0.75)]
@@ -321,13 +352,13 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	row_btns.add_theme_constant_override("separation", 24)
 	row_btns.position = Vector2(940, 935)
 	root.add_child(row_btns)
-	var back := UiKit.button("< BACK", UiKit.BLUE, 44, Vector2(250, 110))
+	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.pressed.connect(func(): _show("main"))
 	row_btns.add_child(back)
-	_continue_btn = UiKit.button("CONTINUE", UiKit.BLUE, 44, Vector2(300, 110))
+	_continue_btn = UiKit.button("Continue", UiKit.BLUE, 44, Vector2(300, 110))
 	_continue_btn.pressed.connect(func(): GameManager.start_run(_selected_theme))
 	row_btns.add_child(_continue_btn)
-	var next := UiKit.button("NEXT >", UiKit.GOLD, 48, Vector2(320, 110))
+	var next := UiKit.button("Next", UiKit.GOLD, 48, Vector2(320, 110))
 	next.pressed.connect(func(): _show("character"))
 	row_btns.add_child(next)
 	return root
@@ -338,7 +369,7 @@ func _select_theme(theme_id: String) -> void:
 	GameManager.selected_theme = theme_id
 	for id in _theme_buttons:
 		UiKit.set_fill(_theme_buttons[id], UiKit.CYAN, id == theme_id)
-	_board_title.text = "Leaderboards  -  %s" % GameManager.theme_name(theme_id)
+	_board_title.text = GameManager.theme_name(theme_id)
 	_continue_btn.visible = GameManager.has_saved_run(theme_id)
 	_fill_board(theme_id)
 
@@ -367,7 +398,7 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	left.position = Vector2(40, 130)
 	left.add_theme_constant_override("separation", 18)
 	root.add_child(left)
-	var new_btn := UiKit.button("+ NEW SET", UiKit.CYAN, 40, Vector2(540, 96))
+	var new_btn := UiKit.button("+ New set", UiKit.BLUE, 40, Vector2(540, 96))
 	new_btn.pressed.connect(_new_custom)
 	left.add_child(new_btn)
 	var scroll := ScrollContainer.new()
@@ -406,19 +437,19 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	var tools := HBoxContainer.new()
 	tools.add_theme_constant_override("separation", 20)
 	v.add_child(tools)
-	var help := UiKit.button("FORMAT HELP", UiKit.BLUE, 26, Vector2(232, 70))
+	var help := UiKit.button("Format help", UiKit.BLUE, 26, Vector2(232, 70))
 	help.pressed.connect(_show_custom_help)
 	tools.add_child(help)
-	var ai := UiKit.button("AI PROMPT", UiKit.GOLD, 26, Vector2(232, 70))
+	var ai := UiKit.button("AI prompt", UiKit.BLUE, 26, Vector2(232, 70))
 	ai.pressed.connect(_show_ai_prompt)
 	tools.add_child(ai)
-	var open := UiKit.button("OPEN FILE", UiKit.BLUE, 26, Vector2(232, 70))
+	var open := UiKit.button("Open file", UiKit.BLUE, 26, Vector2(232, 70))
 	open.pressed.connect(_open_custom_file)
 	tools.add_child(open)
-	var paste := UiKit.button("PASTE", UiKit.BLUE, 26, Vector2(232, 70))
+	var paste := UiKit.button("Paste", UiKit.BLUE, 26, Vector2(232, 70))
 	paste.pressed.connect(_paste_custom)
 	tools.add_child(paste)
-	_custom_delete = UiKit.button("DELETE", UiKit.BLUE, 26, Vector2(200, 70))
+	_custom_delete = UiKit.button("Delete", UiKit.BLUE, 26, Vector2(200, 70))
 	_custom_delete.pressed.connect(_delete_custom)
 	tools.add_child(_custom_delete)
 
@@ -427,13 +458,13 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	row.add_theme_constant_override("separation", 24)
 	row.position = Vector2(940, 935)
 	root.add_child(row)
-	var back := UiKit.button("< BACK", UiKit.BLUE, 44, Vector2(250, 110))
+	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.pressed.connect(func(): _show("mode"))
 	row.add_child(back)
-	var save := UiKit.button("SAVE", UiKit.BLUE, 44, Vector2(250, 110))
+	var save := UiKit.button("Save", UiKit.BLUE, 44, Vector2(250, 110))
 	save.pressed.connect(_save_custom)
 	row.add_child(save)
-	var play := UiKit.button("PLAY >", UiKit.GOLD, 48, Vector2(320, 110))
+	var play := UiKit.button("Play", UiKit.GOLD, 48, Vector2(320, 110))
 	play.pressed.connect(_play_custom)
 	row.add_child(play)
 
@@ -550,7 +581,7 @@ func _load_custom(set_id: String) -> void:
 	_custom_text.text = data.text
 	_delete_armed = false
 	_custom_delete.disabled = false
-	_custom_delete.text = "DELETE"
+	_custom_delete.text = "Delete"
 	_validate_custom()
 	_refresh_custom_list()
 
@@ -608,10 +639,10 @@ func _delete_custom() -> void:
 		return
 	if not _delete_armed:
 		_delete_armed = true
-		_custom_delete.text = "SURE?"
+		_custom_delete.text = "Sure?"
 		return
 	CustomQuiz.delete_set(_custom_id)
-	_custom_delete.text = "DELETE"
+	_custom_delete.text = "Delete"
 	_new_custom()
 
 
@@ -684,22 +715,22 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 	v.add_child(p.desc)
 	p.status = UiKit.title("", 40, Color.WHITE, 8)
 	v.add_child(p.status)
-	p.buy = UiKit.button("BUY", UiKit.GOLD, 40, Vector2(400, 100))
+	p.buy = UiKit.button("Buy", UiKit.GOLD, 40, Vector2(400, 100))
 	p.buy.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	p.buy.pressed.connect(_on_buy.bind(kind))
 	v.add_child(p.buy)
 
 	# Browse arrows on either side of the character.
-	var left := UiKit.button("<", UiKit.BLUE, 64, Vector2(120, 120))
-	left.position = Vector2(960, 480)
+	var left := UiKit.button("<", UiKit.BLUE, 64, Vector2(104, 134))
+	left.position = Vector2(790, 480) # clear of the character on the stand
 	left.pressed.connect(_browse.bind(kind, -1))
 	root.add_child(left)
-	var right := UiKit.button(">", UiKit.BLUE, 64, Vector2(120, 120))
+	var right := UiKit.button(">", UiKit.BLUE, 64, Vector2(104, 134))
 	right.position = Vector2(1740, 480)
 	right.pressed.connect(_browse.bind(kind, 1))
 	root.add_child(right)
 
-	var back := UiKit.button("< BACK", UiKit.BLUE, 44, Vector2(250, 110))
+	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.position = Vector2(80, 940)
 	back.pressed.connect(func(): _show(_back_of(kind)))
 	root.add_child(back)
@@ -743,12 +774,12 @@ func _refresh_picker(kind: String) -> void:
 	if owned:
 		p.status.text = "Equipped" if Economy.equipped(_slot(kind)) == item.id else "Owned"
 	else:
-		p.status.text = "Locked  -  %d tansan" % item.price
+		p.status.text = "Locked  %d tansan" % item.price
 	p.buy.visible = not owned
 	p.buy.disabled = not Economy.can_afford(item.price)
-	p.buy.text = ("CONFIRM  -%d" % item.price) if p.confirm else ("BUY  %d" % item.price)
+	p.buy.text = ("Confirm  -%d" % item.price) if p.confirm else ("Buy  %d" % item.price)
 	if p.buy.disabled:
-		p.buy.text = "NEED %d MORE" % (item.price - Economy.caps)
+		p.buy.text = "Need %d more" % (item.price - Economy.caps)
 	p.next.disabled = not owned
 
 	# Show it on the court; locked items are shown as a dark silhouette.
@@ -819,11 +850,12 @@ func _build_simple(ui: CanvasLayer, heading: String, body: String) -> Control:
 	v.add_theme_constant_override("separation", 30)
 	panel.add_child(v)
 	v.add_child(UiKit.title(heading, 76, Color.WHITE, 12))
+	v.add_child(UiKit.accent_rule())
 	var text := UiKit.label(body, 36)
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(text)
-	var back := UiKit.button("< BACK", UiKit.BLUE, 44, Vector2(250, 110))
+	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	back.pressed.connect(func(): _show("main"))
 	v.add_child(back)

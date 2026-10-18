@@ -43,6 +43,17 @@ func _ready() -> void:
 	# Captions and big text in the title font; the controls hint stays plain.
 	for l in [_status, _round_label, _awra_label, $Margin/VBox/StaminaLabel, _wind_label]:
 		UiKit.use_title_font(l)
+	# Bars: rounded, on a dark track, same family as the menus.
+	for bar: ProgressBar in [_awra_bar, _stamina_bar]:
+		var track := StyleBoxFlat.new()
+		track.bg_color = Color(0, 0, 0, 0.45)
+		track.set_corner_radius_all(8)
+		bar.add_theme_stylebox_override("background", track)
+		var fill := bar.get_theme_stylebox("fill").duplicate() as StyleBoxFlat
+		if fill:
+			fill.set_corner_radius_all(8)
+			bar.add_theme_stylebox_override("fill", fill)
+	$Margin/VBox/Hint.modulate = Color(1, 1, 1, 0.7) # controls hint stays quiet
 	# The bubble letters are thin: small captions get a dark outline and a bit more size.
 	for l: Label in [_round_label, _awra_label, $Margin/VBox/StaminaLabel, _wind_label]:
 		l.add_theme_color_override("font_outline_color", UiKit.TEXT_OUTLINE)
@@ -193,13 +204,13 @@ func _corner_label(top: float, font_size: int) -> Label:
 func _build_pause_panel() -> Control:
 	var root := _dim_backdrop()
 	var v := _center_panel(root, "Paused")
-	var resume := UiKit.button("RESUME", UiKit.BLUE, 52, Vector2(460, 120))
+	var resume := UiKit.button("Resume", UiKit.BLUE, 52, Vector2(460, 120))
 	resume.pressed.connect(func(): resume_pressed.emit())
 	v.add_child(resume)
-	var settings := UiKit.button("SETTINGS", UiKit.BLUE, 52, Vector2(460, 120))
+	var settings := UiKit.button("Settings", UiKit.BLUE, 52, Vector2(460, 120))
 	settings.pressed.connect(_open_settings)
 	v.add_child(settings)
-	var menu := UiKit.button("MAIN MENU", UiKit.BLUE, 52, Vector2(460, 120))
+	var menu := UiKit.button("Main menu", UiKit.BLUE, 52, Vector2(460, 120))
 	menu.pressed.connect(func(): main_menu_pressed.emit())
 	v.add_child(menu)
 	return root
@@ -235,10 +246,10 @@ func _build_game_over_panel() -> Control:
 	_over_text = UiKit.label("", 42, Color.WHITE, 8)
 	_over_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_over_text)
-	var again := UiKit.button("PLAY AGAIN", UiKit.GOLD, 52, Vector2(460, 120))
+	var again := UiKit.button("Play again", UiKit.GOLD, 52, Vector2(460, 120))
 	again.pressed.connect(func(): play_again_pressed.emit())
 	v.add_child(again)
-	var menu := UiKit.button("MAIN MENU", UiKit.BLUE, 52, Vector2(460, 120))
+	var menu := UiKit.button("Main menu", UiKit.BLUE, 52, Vector2(460, 120))
 	menu.pressed.connect(func(): main_menu_pressed.emit())
 	v.add_child(menu)
 	return root
@@ -268,4 +279,7 @@ func _center_panel(root: Control, heading: String) -> VBoxContainer:
 	var title := UiKit.title(heading, 88, Color.WHITE, 14)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
+	var rule := UiKit.accent_rule()
+	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(rule)
 	return v

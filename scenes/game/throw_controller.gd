@@ -215,6 +215,8 @@ func _launch() -> void:
 	_tsinelas.global_transform = Transform3D(Basis.looking_at(velocity.normalized(), Vector3.UP), origin)
 	_tsinelas.add_collision_exception_with(_player)
 	_tint_equipped_slipper(_tsinelas)
+	if Enchant.is_enchanted(Economy.equipped_slipper_item()):
+		_tsinelas.set_enchanted(true) # star trail
 	_tsinelas.settled.connect(func(): settled.emit())
 	_tsinelas.launch(velocity, _wind_accel())
 

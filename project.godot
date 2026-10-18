@@ -24,6 +24,7 @@ Economy="*res://autoload/economy.gd"
 Transition="*res://autoload/transition.gd"
 Sfx="*res://autoload/sfx.gd"
 Music="*res://autoload/music.gd"
+Settings="*res://autoload/settings.gd"
 
 [display]
 

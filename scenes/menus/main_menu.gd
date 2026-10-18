@@ -62,6 +62,7 @@ var _char_happy_left := 0.0
 ## pixel art keeps its exact colours; the 3D view's tone mapping would
 ## darken and wash it out.
 var _slipper_icon: TextureRect
+var _logo: TextureRect
 const SLIPPER_ICON_SCALE := 14.0 ## screen pixels per art pixel
 const SLIPPER_ICON_CENTER := Vector2(1500, 560)
 
@@ -81,8 +82,11 @@ func _ready() -> void:
 			func(): _confirm_pick("character", "weapon"))
 	_panels["weapon"] = _build_picker(ui, "weapon", "Select weapon...", "GO >",
 			func(): _confirm_pick("weapon", ""))
-	_panels["settings"] = _build_simple(ui, "Settings", "Audio, graphics, controls and language\nare coming in the polish pass.")
+	_panels["settings"] = _build_settings(ui)
 	_panels["credits"] = _build_simple(ui, "Credits", "Tumbang Henyo\n\nGame design, art and code by the Tumbang Henyo team.")
+	# A bit smaller than the layouts were drawn, each piece toward its own edge.
+	for key in _panels:
+		UiFx.shrink(_panels[key])
 	_select_theme(GameManager.selected_theme)
 	_show("main", true)
 
@@ -128,6 +132,7 @@ func _back_of(panel_id: String) -> String:
 
 
 func _show(panel_id: String, instant: bool = false) -> void:
+	var changed := panel_id != _current
 	_current = panel_id
 	if panel_id == "custom":
 		_enter_custom()
@@ -135,6 +140,11 @@ func _show(panel_id: String, instant: bool = false) -> void:
 		_panels[key].visible = key == panel_id
 	if _pickers.has(panel_id):
 		_open_picker(panel_id)
+	if changed:
+		# The new panel springs in piece by piece; the logo drops in on its own.
+		UiFx.pop_in(_panels[panel_id], 0.05)
+		if panel_id == "main":
+			UiFx.logo_intro(_logo, 0.0)
 	var shot: Dictionary = SHOTS[panel_id]
 	if _tween:
 		_tween.kill()
@@ -233,7 +243,9 @@ func _build_main(ui: CanvasLayer) -> Control:
 
 	var logo := UiKit.logo(900)
 	logo.position = Vector2(110, 150)
+	logo.set_meta("fx_custom", true)
 	root.add_child(logo)
+	_logo = logo
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 36)
@@ -642,6 +654,7 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 		_slipper_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_slipper_icon.stretch_mode = TextureRect.STRETCH_SCALE
 		_slipper_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_slipper_icon.set_meta("fx_skip", true) # positioned and spun every frame in _process
 		root.add_child(_slipper_icon)
 
 	var title := UiKit.label(heading, 72, Color.WHITE, 16)
@@ -714,6 +727,9 @@ func _browse(kind: String, step: int) -> void:
 	p.index = wrapi(p.index + step, 0, p.items.size())
 	p.confirm = false
 	_refresh_picker(kind)
+	UiFx.bounce(p.name, 1.12)
+	if kind != "character":
+		UiFx.bounce(_slipper_icon, 1.2, 0.6)
 
 
 func _refresh_picker(kind: String) -> void:
@@ -778,7 +794,17 @@ func _slot(kind: String) -> String:
 	return "character" if kind == "character" else "slipper"
 
 
-# --- Settings / credits placeholders -------------------------------------------
+# --- Settings / credits ---------------------------------------------------------
+
+func _build_settings(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	var panel := SettingsPanel.new()
+	panel.position = Vector2(530, 150)
+	panel.back_pressed.connect(func(): _show("main"))
+	root.add_child(panel)
+	return root
+
 
 func _build_simple(ui: CanvasLayer, heading: String, body: String) -> Control:
 	var root := UiKit.full_rect()

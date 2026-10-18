@@ -16,6 +16,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for i in VOICES:
 		var p := AudioStreamPlayer.new()
+		p.bus = &"SFX" # volume set in Settings
 		add_child(p)
 		_players.append(p)
 

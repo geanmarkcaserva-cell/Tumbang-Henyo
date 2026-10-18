@@ -29,6 +29,9 @@ var _over_panel: Control
 var _over_text: Label
 var _fade: ColorRect
 var _fade_tween: Tween
+var _settings_panel: Control
+var _last_score := 0
+var _last_caps := 0
 
 
 func _ready() -> void:
@@ -46,6 +49,8 @@ func _ready() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fade.z_index = 40 # over the game and quiz, under pause / game over (50)
 	add_child(_fade)
+	_settings_panel = _build_settings_panel()
+	UiFx.shrink(self) # a bit smaller than drawn, each piece toward its own edge
 
 
 ## Fade the screen to black. await it to know when it's fully black.
@@ -89,14 +94,23 @@ func set_round(number: int) -> void:
 
 func set_score(value: int) -> void:
 	_score_label.text = "Score  %d" % value
+	if value > _last_score:
+		UiFx.bounce(_score_label, 1.2)
+	_last_score = value
 
 
 func set_caps(value: int) -> void:
 	_caps_label.text = "Tansan  %d" % value
+	if value > _last_caps and _last_caps > 0:
+		UiFx.bounce(_caps_label, 1.2)
+	_last_caps = value
 
 
 func show_status(text: String) -> void:
+	var is_new := text != "" and text != _status.text
 	_status.text = text
+	if is_new:
+		UiFx.bounce(_status, 1.22, 0.6)
 
 
 func show_throw_ui(on: bool) -> void:
@@ -123,7 +137,11 @@ func update_wind(wind: Vector3, view_basis: Basis) -> void:
 
 
 func show_pause(on: bool) -> void:
+	var was := _pause_panel.visible or _settings_panel.visible
+	_settings_panel.visible = false
 	_pause_panel.visible = on
+	if on and not was:
+		UiFx.pop_in(_pause_panel)
 
 
 func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: int) -> void:
@@ -141,6 +159,7 @@ func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: 
 	_over_text.text = "\n".join(lines)
 	_over_panel.visible = true
 	_status.text = ""
+	UiFx.pop_in(_over_panel)
 
 
 # --- Built in code ----------------------------------------------------------------
@@ -170,10 +189,37 @@ func _build_pause_panel() -> Control:
 	var resume := UiKit.button("RESUME", UiKit.BLUE, 52, Vector2(460, 120))
 	resume.pressed.connect(func(): resume_pressed.emit())
 	v.add_child(resume)
+	var settings := UiKit.button("SETTINGS", UiKit.BLUE, 52, Vector2(460, 120))
+	settings.pressed.connect(_open_settings)
+	v.add_child(settings)
 	var menu := UiKit.button("MAIN MENU", UiKit.BLUE, 52, Vector2(460, 120))
 	menu.pressed.connect(func(): main_menu_pressed.emit())
 	v.add_child(menu)
 	return root
+
+
+## Settings from the pause menu: same card as the main menu's.
+func _build_settings_panel() -> Control:
+	var root := _dim_backdrop()
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+	var panel := SettingsPanel.new()
+	panel.back_pressed.connect(_close_settings)
+	center.add_child(panel)
+	return root
+
+
+func _open_settings() -> void:
+	_pause_panel.visible = false
+	_settings_panel.visible = true
+	UiFx.pop_in(_settings_panel)
+
+
+func _close_settings() -> void:
+	_settings_panel.visible = false
+	_pause_panel.visible = true
+	UiFx.pop_in(_pause_panel)
 
 
 func _build_game_over_panel() -> Control:

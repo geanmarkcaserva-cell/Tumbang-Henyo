@@ -56,7 +56,10 @@ func _process(delta: float) -> void:
 	_loading.text = "Loading" + ".".repeat(int(_time * 3.0) % 4)
 	# Little wobble, like a slipper about to be thrown.
 	_mascot.rotation = deg_to_rad(sin(_time * 5.0) * 6.0) # the art is already tilted
-	_mascot.scale = Vector2.ONE * (1.0 + sin(_time * 2.5) * 0.03)
+	# Springs in at the start (overshoot and settle), then breathes.
+	var k := minf(_time / 0.7, 1.0) - 1.0
+	var intro := 1.0 + 2.70158 * k * k * k + 1.70158 * k * k # ease-out-back
+	_mascot.scale = Vector2.ONE * intro * (1.0 + sin(_time * 2.5) * 0.03)
 
 	if status == ResourceLoader.THREAD_LOAD_LOADED and _time >= min_time:
 		set_process(false)

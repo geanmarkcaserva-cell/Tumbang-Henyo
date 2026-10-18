@@ -45,6 +45,7 @@ static func button(text: String, fill: Color = BLUE, font_size: int = 56, min_si
 	b.add_theme_constant_override("outline_size", 10)
 	set_fill(b, fill, false)
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	UiFx.hookup_button(b) # bouncy hover / press
 	return b
 
 

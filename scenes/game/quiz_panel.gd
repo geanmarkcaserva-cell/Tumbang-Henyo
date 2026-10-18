@@ -24,6 +24,7 @@ func _ready() -> void:
 	visible = false
 	for i in _buttons.size():
 		_buttons[i].pressed.connect(_choose.bind(i))
+		UiFx.hookup_button(_buttons[i])
 
 
 ## Seconds left when the player answered (for scoring later).
@@ -42,7 +43,14 @@ func ask(question_text: String, choices: Array) -> void:
 	_timer_bar.max_value = time_limit
 	_timer_bar.value = time_limit
 	_active = true
+	var was_open := visible
 	visible = true
+	# The card springs up, then the three choices pop in one by one.
+	if not was_open:
+		UiFx.pop($Panel, 0.0, 0.6, 0.5)
+	for i in _buttons.size():
+		UiFx.pop(_buttons[i], 0.12 + i * 0.07, 0.6, 0.45)
+	UiFx.pop(_question_label, 0.05, 0.85, 0.4)
 
 
 ## Highlight the right answer (and the wrong pick, if any).
@@ -51,6 +59,10 @@ func show_result(chosen: int, correct: int, explanation: String) -> void:
 	if chosen >= 0 and chosen != correct:
 		_buttons[chosen].modulate = COLOR_WRONG
 	_buttons[correct].modulate = COLOR_RIGHT
+	UiFx.bounce(_buttons[correct], 1.1, 0.6)
+	if chosen >= 0 and chosen != correct:
+		UiFx.shake(_buttons[chosen])
+	UiFx.bounce(_feedback, 1.25, 0.6)
 	Sfx.play("correct" if chosen == correct else "wrong")
 	if chosen == correct:
 		_feedback.text = "Tama!"

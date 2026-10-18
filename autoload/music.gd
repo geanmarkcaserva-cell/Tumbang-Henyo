@@ -23,6 +23,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # keeps playing while paused
 	_a = AudioStreamPlayer.new()
 	_b = AudioStreamPlayer.new()
+	_a.bus = &"Music" # volume set in Settings
+	_b.bus = &"Music"
 	add_child(_a)
 	add_child(_b)
 

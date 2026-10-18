@@ -64,6 +64,7 @@ func _build_houses(entries: Array) -> void:
 		mi.transform = Transform3D(Basis(Vector3.UP, float(e.ry)).scaled(Vector3.ONE * s), Vector3(p[0], p[1], p[2]))
 		if s > 1.05: # far-off scenery: the shadow would be outside the shadow range anyway
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.add_to_group("detail_heavy") # hidden in low detail mode (Settings)
 		root.add_child(mi)
 
 
@@ -119,6 +120,8 @@ func _build_plants(layout: Dictionary) -> void:
 			mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		if plant_name in cards:
 			mmi.material_override = _card_material(mesh)
+		if plant_name in small or plant_name in cards:
+			mmi.add_to_group("detail_heavy") # hidden in low detail mode (Settings)
 		add_child(mmi)
 
 

@@ -31,6 +31,7 @@ func _ready() -> void:
 	_build_sky()
 	_build_skyline()
 	_build_text()
+	UiFx.pop_in(self, 0.1) # tip text and loading bar spring in
 	ResourceLoader.load_threaded_request(GameManager.GAME)
 
 

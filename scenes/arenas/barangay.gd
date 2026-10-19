@@ -160,6 +160,38 @@ func _card_material(mesh: Mesh) -> Material:
 	return m
 
 
+## The houses you can walk up to (their collision boxes): each entry is
+## {name, centre (ground level), half (half size x/z), basis (house turn)}.
+func house_boxes() -> Array:
+	var out := []
+	var body := get_node_or_null("Colliders")
+	if body == null:
+		return out
+	for cs in body.get_children():
+		if not (cs is CollisionShape3D and String(cs.name).begins_with("House_")):
+			continue
+		var size: Vector3 = (cs.shape as BoxShape3D).size
+		var c: Vector3 = cs.global_position
+		out.append({"name": String(cs.name), "centre": Vector3(c.x, 0.0, c.z),
+			"half": Vector2(size.x, size.z) * 0.5, "basis": cs.global_basis})
+	return out
+
+
+## Mama's round: the invisible court walls come down so you can run between
+## the houses, and the ground collider grows to cover the whole barangay.
+func set_open_world(on: bool) -> void:
+	var body := get_node_or_null("Colliders")
+	if body == null:
+		return
+	for n in ["BoundL", "BoundR", "BoundFront", "BoundBack"]:
+		var cs := body.get_node_or_null(n) as CollisionShape3D
+		if cs:
+			cs.set_deferred("disabled", on)
+	var ground := body.get_node_or_null("Ground") as CollisionShape3D
+	if ground:
+		(ground.shape as BoxShape3D).size = Vector3(220.0, 1.0, 220.0) if on else Vector3(70.0, 1.0, 90.0)
+
+
 ## Houses, posts and the invisible play-area boundaries, plus the ground.
 func _build_colliders(boxes: Array) -> void:
 	var body := StaticBody3D.new()

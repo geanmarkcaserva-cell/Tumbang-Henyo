@@ -86,6 +86,10 @@ var caps := STARTER_CAPS
 var owned := {"totoy": true, "goma": true}
 var equipped_character := "totoy"
 var equipped_slipper := "goma"
+## First-run tutorial finished (or skipped). Cleared by "Replay tutorial" in Settings.
+var tutorial_done := false
+## One-time gameplay tips already shown ("wind", "squad", "elite").
+var tips_seen: Array = []
 
 
 func _ready() -> void:
@@ -162,7 +166,18 @@ func save_profile() -> void:
 	cfg.set_value("profile", "owned", owned.keys())
 	cfg.set_value("profile", "character", equipped_character)
 	cfg.set_value("profile", "slipper", equipped_slipper)
+	cfg.set_value("progress", "tutorial_done", tutorial_done)
+	cfg.set_value("progress", "tips_seen", tips_seen)
 	cfg.save(SAVE_PATH)
+
+
+## A one-time tip: true the first time it's asked for (and remembers it).
+func first_time(tip_id: String) -> bool:
+	if tips_seen.has(tip_id):
+		return false
+	tips_seen.append(tip_id)
+	save_profile()
+	return true
 
 
 func load_profile() -> void:
@@ -174,3 +189,5 @@ func load_profile() -> void:
 		owned[item_id] = true
 	equipped_character = cfg.get_value("profile", "character", "totoy")
 	equipped_slipper = cfg.get_value("profile", "slipper", "goma")
+	tutorial_done = cfg.get_value("progress", "tutorial_done", false)
+	tips_seen = cfg.get_value("progress", "tips_seen", [])

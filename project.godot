@@ -25,6 +25,7 @@ Transition="*res://autoload/transition.gd"
 Sfx="*res://autoload/sfx.gd"
 Music="*res://autoload/music.gd"
 Settings="*res://autoload/settings.gd"
+Lobby="*res://autoload/lobby.gd"
 
 [display]
 
@@ -150,6 +151,8 @@ jump={
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_s3tc_bptc=true
+textures/vram_compression/import_etc2_astc=true
 textures/vram_compression/compress_with_gpu=false
 lights_and_shadows/directional_shadow/size=4096.0
 lights_and_shadows/directional_shadow/size.mobile=2048.0

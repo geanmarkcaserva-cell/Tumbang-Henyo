@@ -11,6 +11,7 @@ signal stamina_changed(value: float, max_value: float)
 @export var sprint_speed := 8.0
 @export var acceleration := 30.0
 @export var mouse_sensitivity := 0.003
+@export var touch_sensitivity := 0.0055 ## radians per design pixel of finger drag
 @export var max_stamina := 50.0 ## halved from 100: Energy is the player's only edge, so spend it carefully
 @export var stamina_drain := 18.0 ## per second while sprinting (about 2.8 s of full sprint)
 @export var stamina_regen := 15.0 ## per second while not sprinting
@@ -120,15 +121,25 @@ func get_throw_origin() -> Vector3:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (controls_enabled or look_enabled):
 		return
+	if TouchControls.active:
+		return # touch drags arrive through touch_look(); ignore their emulated mouse events
 	if event is InputEventMouseMotion and look_enabled and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * mouse_sensitivity)
-		_pivot.rotation.x = clampf(
-			_pivot.rotation.x - event.relative.y * mouse_sensitivity,
-			deg_to_rad(min_pitch_deg),
-			deg_to_rad(max_pitch_deg)
-		)
+		_turn(event.relative * mouse_sensitivity)
 	elif event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Look with a finger drag on the touch controls (design pixels).
+func touch_look(relative: Vector2) -> void:
+	if look_enabled:
+		_turn(relative * touch_sensitivity)
+
+
+## Yaw the body, pitch the camera (radians).
+func _turn(amount: Vector2) -> void:
+	rotate_y(-amount.x)
+	_pivot.rotation.x = clampf(_pivot.rotation.x - amount.y,
+			deg_to_rad(min_pitch_deg), deg_to_rad(max_pitch_deg))
 
 
 func _physics_process(delta: float) -> void:

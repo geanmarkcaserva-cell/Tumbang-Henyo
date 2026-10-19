@@ -22,6 +22,8 @@ var player_name := "Ikaw" ## until players can type a name
 
 
 func theme_name(theme_id: String) -> String:
+	if theme_id == Lobby.quiz_theme and Lobby.quiz_title != "":
+		return Lobby.quiz_title # a class game's set lives on the teacher's device
 	if CustomQuiz.is_custom(theme_id):
 		return CustomQuiz.title_of(theme_id)
 	for t in THEMES:

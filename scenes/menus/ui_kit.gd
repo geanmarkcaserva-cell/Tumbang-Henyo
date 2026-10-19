@@ -53,6 +53,19 @@ static func title_font() -> Font:
 	return _title_font
 
 
+static var _key_font: Font
+
+## Clean bold sans for keycaps ("LMB", "Space", "Shift"): the default font,
+## slightly bolded, so key names read clearly instead of in the bubble font.
+static func key_font() -> Font:
+	if _key_font == null:
+		var v := FontVariation.new()
+		v.base_font = ThemeDB.fallback_font
+		v.variation_embolden = 0.6
+		_key_font = v
+	return _key_font
+
+
 ## Use the title font on any Control (Label, Button, ...).
 static func use_title_font(c: Control) -> void:
 	c.add_theme_font_override("font", title_font())

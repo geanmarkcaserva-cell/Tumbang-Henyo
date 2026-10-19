@@ -30,6 +30,11 @@ func set_custom_questions(theme: String, questions: Array) -> void:
 	_by_theme[theme] = questions
 
 
+## Every question of a theme (e.g. to send a custom set to a class lobby).
+func questions_of(theme: String) -> Array:
+	return _by_theme.get(theme, []).duplicate(true)
+
+
 ## A random fact for the loading screen, taken from a question's explanation.
 func random_tip(theme: String) -> String:
 	var pool: Array = _by_theme.get(theme, []).filter(func(q): return q.explanation != "")

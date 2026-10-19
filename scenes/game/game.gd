@@ -9,6 +9,16 @@ extends Node3D
 enum State { QUIZ, THROW, RUN, ROUND_CLEAR, GAME_OVER, TAGGED }
 
 const TAYA_SCENE := preload("res://scenes/game/taya.tscn")
+const WIND_LEAVES := preload("res://scenes/game/wind_leaves.gd")
+const BULLSEYE_CAM := preload("res://scenes/game/bullseye_cam.gd")
+## Bullseye: the round's attack lands with no mistake in the round so far
+## (no wrong answer, no miss) and the tsinelas hits the lata before it
+## touches the ground or anything else.
+const POINTS_BULLSEYE := 150
+const QUIZ_TIME := 15.0 ## seconds per question (the tutorial gives more)
+## Practice round: the tayas are slower and take longer to stand the lata up.
+const TUTORIAL_TAYA_SPEED_RATIO := 0.85
+const TUTORIAL_RESET_MULT := 1.8
 
 const MAX_AWRA := 100
 const AWRA_WRONG := 20
@@ -40,6 +50,28 @@ const POINTS_ROUND_CLEAR := 200
 ## Rect2(min x, min z, width, depth).
 const THROW_ZONE := Rect2(-8.6, -5.6, 17.2, 3.6)
 
+## Clock: the time of day moves forward whenever you score. Round 1 starts at
+## 8:00 AM and round 15 at 6:00 PM, when Mama comes home.
+const CLOCK_START := 8.0 * 60.0
+const CLOCK_MAMA := 18.0 * 60.0
+const CLOCK_ANSWER_STEP := 0.3 ## share of a round's time for a right answer
+const CLOCK_HIT_STEP := 0.3 ## ...and for knocking the lata down
+const CLOCK_ROUND_CAP := 0.9 ## the rest of the slice comes with the round clear
+
+## Round 15, Mama's round (see _begin_mama_round).
+const MAMA_ROUND := 15
+const MAMA_SCRIPT := preload("res://scenes/game/mama.gd")
+const BEACON_SCRIPT := preload("res://scenes/game/beacon.gd")
+const MAMA_TIME := 30.0 ## seconds to reach the beacon house
+const MAMA_WAIT_SPOT := Vector3(4.5, 0.0, -28.0) ## where she glares from during the quiz (off to the side, so she's in view)
+const MAMA_HOUSE_DISTANCE := Vector2(60.0, 80.0) ## from the spawn; the court finish is ~36 m
+const MAMA_GOAL_MARGIN := 1.8 ## metres around the house that count as "home"
+const MAMA_AREA := Rect2(-68.0, -88.0, 136.0, 146.0) ## where you can run in her round
+const AWRA_MAMA_CAUGHT := 30
+const AWRA_MAMA_LATE := 30
+const AWRA_MAMA_HIT := 10
+const POINTS_MAMA := 1000
+
 ## Guard spots for extra tayas, as offsets from the lata.
 const TAYA_SPOTS := [Vector3(-1.6, 0, -1.2), Vector3(2.6, 0, 1.6), Vector3(-2.6, 0, 1.6), Vector3(0.0, 0, -2.8)]
 
@@ -57,6 +89,21 @@ var _round_points := 0
 var _run_caps := 0
 var _tayas: Array = []
 var _lata_home := Vector3.ZERO
+var _tut: Tutorial ## only on a first run (until finished or skipped)
+var _leaves: Node3D
+var _round_progress := 0.0 ## 0..1 through this round's slice of the clock
+var _round_clean := true ## no wrong answer or miss yet this round (bullseye still possible)
+var _bullseye: Node3D
+var perfect_shots := 0
+
+var _mama_on := false ## Mama's round is running
+var _mama: CharacterBody3D
+var _beacon: Node3D
+var _goal: Dictionary = {} ## the house to reach (from Barangay.house_boxes())
+var _mama_left := 0.0
+var _sun: DirectionalLight3D
+var _sun_colour := Color.WHITE
+var _sun_energy := 1.0
 
 @onready var _player: CharacterBody3D = $Player
 @onready var _hud: CanvasLayer = $HUD
@@ -87,22 +134,107 @@ func _ready() -> void:
 	_hud.play_again_pressed.connect(func(): Transition.reload())
 	_hud.main_menu_pressed.connect(_quit_to_menu)
 	Economy.caps_changed.connect(_hud.set_caps)
+	_hud.bind_player(_player)
 
 	_hook_taya($Arena/Taya)
 	_ensure_tayas()
 
+	_bullseye = BULLSEYE_CAM.new()
+	_bullseye.name = "BullseyeCam"
+	add_child(_bullseye)
+	_bullseye.bullseye.connect(_on_bullseye)
+
+	_leaves = WIND_LEAVES.new()
+	_leaves.name = "WindLeaves"
+	_leaves.follow = _player
+	add_child(_leaves)
+	if not Economy.tutorial_done:
+		_tut = Tutorial.new()
+		_tut.name = "Tutorial"
+		add_child(_tut)
+		_tut.setup(_hud, _player, _finish)
+
 	QuizDatabase.reset_run()
+	if Lobby.in_match():
+		# Class game: same seed for everyone, so the questions (and the wind)
+		# come in the same order for the whole class.
+		seed(Lobby.match_seed)
+		_hud.enable_class_board()
+		Lobby.match_ended.connect(_on_class_ended)
+		Lobby.left.connect(_on_class_left)
 	_hud.set_awra(awra, MAX_AWRA)
 	_hud.set_round(round_number)
 	_hud.set_score(score)
 	_hud.set_caps(Economy.caps)
 	_hud.update_wind(Vector3.ZERO, _player.global_basis)
+	_hud.set_clock(_clock_minutes(), true)
+	_begin()
+
+
+## First run: the tutorial's welcome card, then the first question.
+func _begin() -> void:
+	if _tut:
+		_set_player_mode(false, false) # stand still behind the welcome card
+		_hud.set_context("none")
+		await _tut.start()
 	_enter_quiz()
 
 
-func _process(_delta: float) -> void:
+func _tutorial_on() -> bool:
+	return _tut != null and _tut.running
+
+
+## Lock the mouse for aiming (not with touch controls: fingers need the cursor free).
+func _capture_mouse() -> void:
+	if not TouchControls.active:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _process(delta: float) -> void:
+	if Lobby.is_client():
+		_report_class()
 	if state == State.THROW:
 		_hud.update_wind(_wind, _player.global_basis)
+	elif state == State.RUN and _mama_on:
+		_mama_tick(delta)
+
+
+# --- Class game (multiplayer) ---------------------------------------------------------
+
+## Tell the teacher's lobby how this run is going. The live score counts the
+## points earned so far this round (banked on round clear) so the board moves
+## as students answer and hit. Lobby only sends when something changed.
+func _report_class() -> void:
+	var live := score + int(round(_round_points * (1.0 + 0.1 * (round_number - 1))))
+	if state == State.ROUND_CLEAR or state == State.GAME_OVER:
+		live = score
+	Lobby.report(live, round_number, awra, state == State.GAME_OVER, perfect_shots)
+
+
+## The teacher ended the class game: this run is over.
+func _on_class_ended() -> void:
+	if state == State.GAME_OVER:
+		return
+	_game_over()
+	_hud.show_banner("Time's up!", "Your teacher ended the game.", UiKit.ACCENT, 2.4)
+
+
+func _on_class_left(reason: String) -> void:
+	_hud.show_status("Lost the class lobby: %s Your game goes on solo." % reason)
+
+
+# --- Clock --------------------------------------------------------------------------
+
+## Time of day in minutes: each round is an equal slice between 8 AM and 6 PM.
+func _clock_minutes() -> float:
+	var per_round := (CLOCK_MAMA - CLOCK_START) / float(MAMA_ROUND - 1)
+	return CLOCK_START + per_round * (round_number - 1 + _round_progress)
+
+
+## Scored something: the clock ticks forward (never into the next round).
+func _advance_clock(step: float) -> void:
+	_round_progress = minf(_round_progress + step, CLOCK_ROUND_CAP)
+	_hud.set_clock(_clock_minutes())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -233,6 +365,8 @@ func _enter_quiz() -> void:
 	_set_player_mode(false, false)
 	_throw.end()
 	_hud.show_throw_ui(false)
+	_hud.set_context("quiz")
+	_leaves.set_active(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_question = QuizDatabase.next_question(theme_id, "easy")
 	if _question.is_empty():
@@ -245,17 +379,23 @@ func _enter_quiz() -> void:
 	for i in order:
 		choices.append(_question.choices[i])
 	_correct_index = order.find(_question.answer)
+	_quiz.time_limit = _tut.quiz_time_limit() if _tutorial_on() else QUIZ_TIME
 	_quiz.ask(_question.question, choices)
+	if _tutorial_on():
+		_tut.on_quiz_shown()
 
 
 func _on_quiz_answered(choice_index: int) -> void:
 	if state != State.QUIZ:
 		return
 	_quiz.show_result(choice_index, _correct_index, _question.explanation)
+	if _tutorial_on():
+		_tut.on_answer(choice_index == _correct_index)
 	if choice_index == _correct_index:
 		var points := mini(POINTS_ANSWER_BASE + POINTS_PER_SECOND * int(_quiz.get_time_left()), POINTS_ANSWER_MAX)
 		_round_points += points
 		_add_caps(CAPS_CORRECT)
+		_advance_clock(CLOCK_ANSWER_STEP)
 		_hud.show_status("+%d" % points)
 		await _wait(0.8)
 		if state != State.QUIZ:
@@ -274,10 +414,13 @@ func _on_quiz_timed_out() -> void:
 	if state != State.QUIZ:
 		return
 	_quiz.show_result(-1, _correct_index, _question.explanation)
+	if _tutorial_on():
+		_tut.on_answer(false)
 	_answer_failed()
 
 
 func _answer_failed() -> void:
+	_round_clean = false
 	_hud.show_status("")
 	_player.hurt() # squish + red flash
 	_lose_awra(AWRA_WRONG)
@@ -294,22 +437,46 @@ func _answer_failed() -> void:
 
 func _enter_throw() -> void:
 	_set_state(State.THROW)
-	_wind = _roll_wind()
+	_wind = Vector3.ZERO if _tutorial_on() else _roll_wind()
 	# Walk freely behind the throw line (no sprinting), aim with the mouse.
 	_set_player_mode(true, true)
 	_player.sprint_enabled = false
 	_player.set_move_bounds(THROW_ZONE)
 	_player.set_aim_mode(true)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_capture_mouse()
 	_hud.show_throw_ui(true)
+	_hud.set_context("throw")
 	_hud.update_wind(_wind, _player.global_basis)
-	_hud.show_status("Tama! Move behind the line, aim, hold click to charge, release")
+	_leaves.set_wind(_wind)
+	_leaves.set_active(true)
+	if _tutorial_on():
+		_hud.show_status("")
+		_tut.on_throw_begin()
+	else:
+		_hud.show_status("Tama! Knock down the lata!")
+		if _wind.length() > 0.05 and Economy.first_time("wind"):
+			_hud.show_tip("Wind!", "The leaves show where it blows. Aim a little into it.", 6.0)
 	_throw.begin(_player, _wind, _preview_for_round())
 
 
 func _on_thrown() -> void:
 	_hud.show_throw_ui(false)
+	_hud.set_context("none")
 	_hud.show_status("")
+	if _tutorial_on():
+		_tut.on_thrown()
+	elif _round_clean:
+		var slipper: Node3D = _throw.current_tsinelas()
+		if slipper:
+			_bullseye.watch(slipper, _lata, _throw._wind_accel())
+
+
+## A perfect, clean first hit: bonus points and the rainbow BULLSEYE!
+## (the slow-motion close-up is BullseyeCam's job).
+func _on_bullseye() -> void:
+	perfect_shots += 1
+	_round_points += POINTS_BULLSEYE
+	_hud.show_bullseye(POINTS_BULLSEYE)
 
 
 func _on_tsinelas_settled() -> void:
@@ -332,19 +499,28 @@ func _on_throw_missed() -> void:
 		return
 	_throw.end()
 	_hud.show_throw_ui(false)
+	_hud.set_context("none")
+	var practice := _tutorial_on()
+	_round_clean = false
 	_lose_awra(AWRA_MISS)
 	if state == State.GAME_OVER:
 		return
 	_hud.show_status("Sablay! Missed the lata.")
 	_player.controls_enabled = false
-	await _wait(1.2)
+	if practice:
+		_tut.on_miss()
+	await _wait(1.6 if practice else 1.2)
 	if state == State.THROW:
-		_next_attempt()
+		if practice:
+			_retry_throw() # practice: straight back to the line, no new question
+		else:
+			_next_attempt()
 
 
 func _on_lata_knocked_down() -> void:
 	if state == State.THROW:
 		_round_points += POINTS_HIT
+		_advance_clock(CLOCK_HIT_STEP)
 		_throw.end()
 		_enter_run()
 
@@ -352,14 +528,26 @@ func _on_lata_knocked_down() -> void:
 # --- Run ----------------------------------------------------------------
 
 func _enter_run() -> void:
+	if _mama_on:
+		_enter_mama_run()
+		return
 	_set_state(State.RUN)
 	_set_player_mode(true, true)
 	_hud.show_throw_ui(false)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	var who := "the taya" if _tayas.size() == 1 else "a taya"
-	_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
+	_hud.set_context("run")
+	_leaves.set_active(false)
+	_capture_mouse()
+	var practice := _tutorial_on()
+	if practice:
+		_hud.show_status("")
+		_tut.on_run()
+	else:
+		var who := "the taya" if _tayas.size() == 1 else "a taya"
+		_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
+	var speed_ratio := TUTORIAL_TAYA_SPEED_RATIO if practice else TAYA_SPEED_RATIO
+	var reset_time := _lata_reset_time() * (TUTORIAL_RESET_MULT if practice else 1.0)
 	for t in _tayas:
-		t.configure(_player.walk_speed * TAYA_SPEED_RATIO, _lata_reset_time(),
+		t.configure(_player.walk_speed * speed_ratio, reset_time,
 				_taya_reaction_time(), _taya_aim_error())
 	# The nearest taya stands the lata up; every other taya goes after the
 	# player straight away (the resetter joins once the lata is up).
@@ -375,19 +563,23 @@ func _on_taya_lata_reset() -> void:
 		return
 	for t in _tayas:
 		t.start_chase()
-	_hud.show_status("Lata is up! Takbo!")
+	if _tutorial_on():
+		_tut.on_lata_up()
+	else:
+		_hud.show_status("Lata is up! Takbo!")
 
 
 func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
 	if state != State.RUN:
 		return
+	var practice := _tutorial_on()
 	_lose_awra(AWRA_SLIPPER_HIT)
 	if state == State.GAME_OVER:
 		return
 	var away := _player.global_position - from_taya.global_position
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
-	_hud.show_status("Aray! -%d Awra" % AWRA_SLIPPER_HIT)
+	_hud.show_status("Aray!" if practice else "Aray! -%d Awra" % AWRA_SLIPPER_HIT)
 
 
 func _on_tagged() -> void:
@@ -395,17 +587,28 @@ func _on_tagged() -> void:
 		return
 	_set_state(State.TAGGED)
 	_set_player_mode(false, false)
+	_hud.set_context("none")
 	_stop_tayas()
+	var practice := _tutorial_on()
 	_lose_awra(AWRA_TAGGED)
 	if state == State.GAME_OVER:
 		return
-	_hud.show_status("Taya ka! -%d Awra" % AWRA_TAGGED)
-	await _wait(1.8)
+	if practice:
+		_hud.show_status("Taya ka!")
+		_tut.on_tagged()
+	else:
+		_hud.show_status("Taya ka! -%d Awra" % AWRA_TAGGED)
+	await _wait(2.4 if practice else 1.8)
 	if state == State.TAGGED:
-		_next_attempt()
+		if practice:
+			_retry_throw()
+		else:
+			_next_attempt()
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
+	if _mama_on:
+		return # in Mama's round the finish is the beacon house
 	if state == State.RUN and body == _player:
 		_round_clear()
 
@@ -415,6 +618,7 @@ func _on_finish_body_entered(body: Node3D) -> void:
 func _round_clear() -> void:
 	_set_state(State.ROUND_CLEAR)
 	_set_player_mode(false, false)
+	_hud.set_context("none")
 	_stop_tayas()
 	_player.celebrate(-1.0) # until the next round respawns them
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -430,19 +634,36 @@ func _round_clear() -> void:
 	await _wait(2.2)
 	if state != State.ROUND_CLEAR:
 		return
+	if _tutorial_on():
+		_hud.show_status("")
+		await _tut.on_round_clear() # "You're ready!" card, waits for the player
+		if state != State.ROUND_CLEAR:
+			return
 	# Fade to black, reset everything out of sight, fade back in on the new question.
 	await _hud.fade_out(FADE_TIME)
 	if state != State.ROUND_CLEAR:
 		return
 	round_number += 1
+	_round_progress = 0.0
+	_round_clean = true
 	_hud.set_round(round_number)
+	_hud.set_clock(_clock_minutes())
 	_hud.show_status("")
+	if _mama_on:
+		_end_mama_round() # Mama's calmed down: the tayas come back out
 	_reset_field()
+	if round_number == MAMA_ROUND:
+		_begin_mama_round()
+		return
 	var joined := _ensure_tayas()
 	_enter_quiz()
 	if joined > 0:
 		var elite_joined: bool = _tayas.back().elite
 		_hud.show_status("Round %d: %s" % [round_number, "an ELITE taya joins! (3 tsinelas)" if elite_joined else "another taya joins!"])
+		if elite_joined and Economy.first_time("elite"):
+			_hud.show_tip("Elite taya", "Elites throw tsinelas at you. Jump to dodge.", 6.0)
+		elif not elite_joined and Economy.first_time("squad"):
+			_hud.show_tip("Two tayas", "One resets the lata, one chases you. Sprint early!", 6.0)
 	await _wait(0.15) # one beat of black so the jump isn't visible
 	_hud.fade_in(FADE_TIME)
 
@@ -462,13 +683,33 @@ func _next_attempt() -> void:
 	_hud.fade_in(FADE_TIME)
 
 
+## Practice round: after a miss or a tag, back to the line without a new question.
+func _retry_throw() -> void:
+	var from_state := state
+	await _hud.fade_out(FADE_TIME)
+	if state != from_state:
+		_hud.fade_in(FADE_TIME)
+		return
+	_hud.show_status("")
+	_reset_field()
+	_enter_throw()
+	await _wait(0.15)
+	_hud.fade_in(FADE_TIME)
+
+
 ## Everyone back to their starting spots for the next attempt.
 func _reset_field() -> void:
+	_bullseye.cancel()
 	_throw.clear_tsinelas()
 	_player.respawn(_spawn.global_position)
 	_lata.reset_to_home()
 	for t in _tayas:
 		t.return_to_guard()
+	if _mama_on:
+		_mama.wait_at(MAMA_WAIT_SPOT)
+		_beacon.visible = false
+		_hud.show_boss_timer(false)
+		_hud.set_beacon(null)
 
 
 func _add_caps(amount: int) -> void:
@@ -477,6 +718,8 @@ func _add_caps(amount: int) -> void:
 
 
 func _lose_awra(amount: int) -> void:
+	if _tutorial_on():
+		return # the practice round is free
 	awra = maxi(awra - amount, 0)
 	_hud.set_awra(awra, MAX_AWRA)
 	if awra <= 0:
@@ -487,14 +730,221 @@ func _game_over() -> void:
 	_set_state(State.GAME_OVER)
 	Economy.save_profile() # bank the tansan earned this run
 	_quiz.close()
+	_bullseye.cancel()
 	_throw.end()
 	_stop_tayas()
+	if _mama:
+		_mama.stop()
 	_hud.show_throw_ui(false)
 	_set_player_mode(false, false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var rounds_cleared := round_number - 1
 	var rank := GameManager.submit_score(theme_id, score, rounds_cleared)
 	_hud.show_game_over(score, rounds_cleared, _run_caps, rank, GameManager.best_score(theme_id))
+	if Lobby.is_client():
+		_report_class() # final score, marked out
+		await get_tree().create_timer(0.6).timeout # let the board catch up
+		_hud.set_class_result(Lobby.my_rank(), Lobby.players.size())
+
+
+# --- Mama's round (round 15, 6:00 PM) ---------------------------------------------
+#
+# The clock hits 6 PM and Mama comes home with her belt. Every taya runs off
+# into a house and disappears. The round still starts with a question and a
+# throw (Mama glares from the far end of the court), but once the lata is
+# down the finish line is gone: a beam of light marks a house far out in the
+# barangay, and you have 30 seconds to get there while Mama chases you,
+# throwing hangers and walis. She's faster than you, so use the houses.
+
+## Called on the black screen after round 14 is cleared.
+func _begin_mama_round() -> void:
+	_mama_on = true
+	_set_player_mode(false, false)
+	_hud.set_context("none")
+	var barangay := _barangay()
+	if barangay:
+		barangay.set_open_world(true)
+	if _mama == null:
+		_mama = MAMA_SCRIPT.new()
+		_mama.name = "Mama"
+		_arena.add_child(_mama)
+		_mama.setup(_player)
+		_mama.caught_player.connect(_on_mama_caught)
+		_mama.hit_player.connect(_on_mama_hit)
+	_mama.visible = true
+	_mama.process_mode = Node.PROCESS_MODE_INHERIT
+	_mama.wait_at(MAMA_WAIT_SPOT)
+	_goal = _pick_goal_house()
+	if _beacon == null:
+		_beacon = BEACON_SCRIPT.new()
+		_beacon.name = "Beacon"
+		_beacon.footprint_radius = maxf(_goal.half.x, _goal.half.y) + MAMA_GOAL_MARGIN * 0.6
+		_arena.add_child(_beacon)
+	_beacon.global_position = _goal.centre
+	_beacon.visible = false
+	_dusk(true)
+	await _wait(0.15)
+	_hud.fade_in(FADE_TIME)
+	_hud.show_banner("6:00 PM", "Mama's home!", Color(1.0, 0.42, 0.36), 2.2)
+	await _wait(0.7)
+	_send_tayas_home()
+	await _wait(2.4)
+	if not _mama_on or state == State.GAME_OVER:
+		return
+	if Economy.first_time("mama"):
+		_hud.show_tip("Mama's round", "Hit the lata, then run to the house with the light in 30 seconds. Mama is faster than you: cut around houses to lose her!", 9.0)
+	_enter_quiz()
+
+
+## Round 16: Mama goes back inside, the tayas come back out.
+func _end_mama_round() -> void:
+	_mama_on = false
+	_goal = {}
+	_mama.stop()
+	_mama.clear_thrown()
+	_mama.visible = false
+	_mama.process_mode = Node.PROCESS_MODE_DISABLED
+	_beacon.visible = false
+	_hud.show_boss_timer(false)
+	_hud.set_beacon(null)
+	var barangay := _barangay()
+	if barangay:
+		barangay.set_open_world(false)
+	_dusk(false)
+	for t in _tayas:
+		t.come_back()
+	_ensure_tayas()
+
+
+func _barangay() -> Node:
+	return _arena.get_node_or_null("Barangay")
+
+
+## Every taya runs into one of the houses near it and vanishes.
+func _send_tayas_home() -> void:
+	var houses: Array = _barangay().house_boxes() if _barangay() else []
+	for t in _tayas:
+		if houses.is_empty():
+			t.vanish()
+			continue
+		var tp := Vector3(t.global_position.x, 0.0, t.global_position.z)
+		houses.sort_custom(func(a, b): return tp.distance_to(a.centre) < tp.distance_to(b.centre))
+		var house: Dictionary = houses[randi() % mini(5, houses.size())]
+		t.flee_to(house.centre, maxf(house.half.x, house.half.y) + 0.8)
+
+
+## A random house far out in the barangay (60-80 m from the start; the court's
+## finish line is about 36 m away).
+func _pick_goal_house() -> Dictionary:
+	var houses: Array = _barangay().house_boxes() if _barangay() else []
+	if houses.is_empty():
+		return {"name": "", "centre": Vector3(0, 0, -70), "half": Vector2(3, 3), "basis": Basis()}
+	var start := Vector3(_spawn.global_position.x, 0.0, _spawn.global_position.z)
+	var far: Array = houses.filter(func(h):
+		var d: float = start.distance_to(h.centre)
+		return d >= MAMA_HOUSE_DISTANCE.x and d <= MAMA_HOUSE_DISTANCE.y)
+	if far.is_empty():
+		houses.sort_custom(func(a, b): return start.distance_to(a.centre) > start.distance_to(b.centre))
+		return houses[0]
+	return far[randi() % far.size()]
+
+
+## Lata down in Mama's round: light the beacon and run.
+func _enter_mama_run() -> void:
+	_set_state(State.RUN)
+	_set_player_mode(true, true)
+	_player.set_move_bounds(MAMA_AREA)
+	_hud.show_throw_ui(false)
+	_hud.set_context("run")
+	_leaves.set_active(false)
+	_capture_mouse()
+	_beacon.visible = true
+	_hud.set_beacon(_goal.centre, _player)
+	_mama_left = MAMA_TIME
+	_hud.show_boss_timer(true)
+	_hud.set_boss_time(_mama_left)
+	_hud.show_status("Takbo! Run home to the light!")
+	_mama.start_chase()
+
+
+func _mama_tick(delta: float) -> void:
+	_mama_left -= delta
+	_hud.set_boss_time(_mama_left)
+	if _at_goal():
+		_mama_success()
+	elif _mama_left <= 0.0:
+		_mama_failed(false)
+
+
+func _at_goal() -> bool:
+	if _goal.is_empty():
+		return false
+	var b: Basis = _goal.basis
+	var local: Vector3 = b.inverse() * (_player.global_position - _goal.centre)
+	return absf(local.x) <= _goal.half.x + MAMA_GOAL_MARGIN and absf(local.z) <= _goal.half.y + MAMA_GOAL_MARGIN
+
+
+func _mama_success() -> void:
+	_mama.stop()
+	_mama.clear_thrown()
+	_hud.show_boss_timer(false)
+	_hud.set_beacon(null)
+	_round_points += POINTS_MAMA
+	_hud.show_banner("Phew!", "Mama's calmed down.", Color(0.55, 0.92, 1.0), 1.8)
+	_round_clear()
+
+
+func _on_mama_caught() -> void:
+	if state == State.RUN and _mama_on:
+		_mama_failed(true)
+
+
+## Caught by Mama, or too late: lose Awra and try the round again.
+func _mama_failed(caught: bool) -> void:
+	_set_state(State.TAGGED)
+	_set_player_mode(false, false)
+	_hud.set_context("none")
+	_hud.show_boss_timer(false)
+	_hud.set_beacon(null)
+	_mama.stop()
+	_player.hurt()
+	_lose_awra(AWRA_MAMA_CAUGHT if caught else AWRA_MAMA_LATE)
+	if state == State.GAME_OVER:
+		return
+	if caught:
+		_hud.show_banner("PALO!", "Mama caught you.  -%d Awra" % AWRA_MAMA_CAUGHT, Color(1.0, 0.42, 0.36), 1.4)
+	else:
+		_hud.show_banner("Too late!", "Mama's still angry.  -%d Awra" % AWRA_MAMA_LATE, Color(1.0, 0.42, 0.36), 1.4)
+	_hud.show_status("")
+	await _wait(2.2)
+	if state == State.TAGGED:
+		_next_attempt()
+
+
+func _on_mama_hit() -> void:
+	if state != State.RUN or not _mama_on:
+		return
+	_lose_awra(AWRA_MAMA_HIT)
+	if state == State.GAME_OVER:
+		return
+	var away := _player.global_position - _mama.global_position
+	away.y = 0.0
+	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
+	_hud.show_status("Aray! -%d Awra" % AWRA_MAMA_HIT)
+
+
+## 6 PM light: the sun goes low and orange for Mama's round.
+func _dusk(on: bool) -> void:
+	if _sun == null:
+		var lights := find_children("*", "DirectionalLight3D", true, false)
+		if lights.is_empty():
+			return
+		_sun = lights[0]
+		_sun_colour = _sun.light_color
+		_sun_energy = _sun.light_energy
+	var t := create_tween().set_parallel()
+	t.tween_property(_sun, "light_color", _sun_colour.lerp(Color(1.0, 0.55, 0.3), 0.55) if on else _sun_colour, 1.5)
+	t.tween_property(_sun, "light_energy", _sun_energy * (0.7 if on else 1.0), 1.5)
 
 
 # --- Pause ----------------------------------------------------------------------
@@ -514,7 +964,7 @@ func _resume() -> void:
 	_hud.show_pause(false)
 	get_tree().paused = false
 	if state == State.THROW or state == State.RUN:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_capture_mouse()
 
 
 func _quit_to_menu() -> void:

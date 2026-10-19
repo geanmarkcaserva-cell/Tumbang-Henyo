@@ -31,11 +31,27 @@ func _init() -> void:
 	if Settings.can_fullscreen():
 		v.add_child(_toggle_row("Fullscreen", "full", Settings.fullscreen,
 				func(on: bool): Settings.set_fullscreen(on)))
+	v.add_child(_toggle_row("Touch controls", "touch", Settings.touch_controls,
+			func(on: bool): Settings.set_touch_controls(on),
+			"On-screen joystick and buttons for phones and touchscreens."))
 
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 20)
+	v.add_child(bottom)
 	var back := UiKit.button("Back", UiKit.BLUE, 40, Vector2(240, 96))
-	back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	back.pressed.connect(func(): back_pressed.emit())
-	v.add_child(back)
+	bottom.add_child(back)
+	# Plays the guided first round again on the next game.
+	var replay := UiKit.button("Replay tutorial", UiKit.BLUE, 40, Vector2(400, 96))
+	replay.disabled = not Economy.tutorial_done
+	replay.pressed.connect(func():
+		Economy.tutorial_done = false
+		Economy.tips_seen.clear()
+		Economy.save_profile()
+		replay.text = "Plays next game"
+		replay.disabled = true
+		UiFx.bounce(replay, 1.1))
+	bottom.add_child(replay)
 
 
 ## Refresh the switches (e.g. fullscreen changed with the keyboard).

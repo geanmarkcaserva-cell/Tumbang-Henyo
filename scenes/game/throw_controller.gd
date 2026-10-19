@@ -72,6 +72,11 @@ func end() -> void:
 	power_changed.emit(power)
 
 
+## The tsinelas in flight (or lying where it landed), if any.
+func current_tsinelas() -> RigidBody3D:
+	return _tsinelas if is_instance_valid(_tsinelas) else null
+
+
 func clear_tsinelas() -> void:
 	if is_instance_valid(_tsinelas):
 		_tsinelas.queue_free()
@@ -81,6 +86,8 @@ func clear_tsinelas() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
+	if TouchControls.active and event is InputEventMouseButton:
+		return # with touch controls the Throw button drives this (taps elsewhere are look drags)
 	if event.is_action_pressed("throw") and not _charging:
 		_charging = true
 		_charge_time = 0.0
@@ -204,10 +211,20 @@ func _tint_equipped_slipper(slipper: Node3D) -> void:
 				Enchant.apply_to_mesh(mesh)
 
 
-func _launch() -> void:
+## Debug/testing: throw straight at `target` so it arrives in `flight_time`
+## seconds (no wind). Used to check the bullseye close-up.
+func debug_throw_at(target: Vector3, flight_time: float = 0.7) -> void:
+	if _player == null:
+		return
+	var origin: Vector3 = _player.get_throw_origin()
+	var g := Vector3(0.0, -_gravity, 0.0) + _wind_accel()
+	_launch((target - origin - 0.5 * g * flight_time * flight_time) / flight_time)
+
+
+func _launch(forced_velocity: Variant = null) -> void:
 	active = false
 	_preview_mesh.clear_surfaces()
-	var velocity := _launch_velocity()
+	var velocity: Vector3 = forced_velocity if forced_velocity != null else _launch_velocity()
 	var origin: Vector3 = _player.get_throw_origin()
 
 	_tsinelas = TSINELAS_SCENE.instantiate()

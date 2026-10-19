@@ -2,6 +2,9 @@
 .godot/
 /android/
 
+# Exported game builds (exe / apk)
+/builds/
+
 # Godot MCP plugin working files (undo snapshots, screenshots, helper scripts)
 addons/godot_mcp/cache/
 

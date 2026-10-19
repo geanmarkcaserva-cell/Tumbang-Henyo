@@ -17,7 +17,12 @@ signal lata_reset ## the lata is back in its circle; the chase starts
 signal tagged_player
 signal hit_player ## one of this taya's tsinelas hit the player
 
-enum State { IDLE, GUARD, RESET, CHASE, WIND_UP, PICKUP, LUNGE, RECOVER }
+signal fled ## ran into a house and vanished (Mama's round)
+
+enum State { IDLE, GUARD, RESET, CHASE, WIND_UP, PICKUP, LUNGE, RECOVER, FLEE }
+
+const FLEE_SPEED := 7.5
+const FLEE_GIVE_UP := 6.0 ## seconds: vanish even if a wall is in the way
 
 const TSINELAS_SCENE := preload("res://scenes/game/tsinelas.tscn")
 const MAX_WINDING_AT_ONCE := 2 ## so five tayas feel like pressure, not a firing squad
@@ -150,6 +155,8 @@ func configure(speed: float, reset_seconds: float, reaction: float = 0.35, scatt
 
 ## Back to the guard spot with full slippers (new round or after a tag).
 func return_to_guard() -> void:
+	if _gone or state == State.FLEE:
+		return # off home for Mama's round
 	_clear_thrown()
 	slippers = max_slippers
 	global_transform = _guard_transform
@@ -182,10 +189,74 @@ func hurt() -> void:
 
 
 func stop() -> void:
+	if state == State.FLEE:
+		return
 	state = State.IDLE
 	_halt()
 	_ring.visible = false
 	_show_alert(false)
+
+
+# --- Mama's round: everyone runs home ------------------------------------------
+
+var _flee_to := Vector3.ZERO
+var _flee_reach := 1.0
+var _gone := false
+
+
+## 6 PM: run to `point` (a house) and disappear inside. `reach` = how close
+## to the point counts as "home" (about the house's half size).
+func flee_to(point: Vector3, reach: float) -> void:
+	_clear_thrown()
+	_ring.visible = false
+	_show_alert(false)
+	_flee_to = _flat(point)
+	_flee_reach = reach
+	_timer = 0.0
+	_speed = 0.0
+	state = State.FLEE
+	_alert.text = "!!"
+	_show_alert(true)
+
+
+func is_gone() -> bool:
+	return _gone
+
+
+## Gone for the round: invisible, no collision, does nothing.
+func vanish() -> void:
+	_show_alert(false)
+	_alert.text = "!"
+	state = State.IDLE
+	_halt()
+	var t := create_tween()
+	t.tween_property($PaperDoll, "scale", Vector3(0.05, 1.4, 0.05), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	t.tween_callback(func():
+		visible = false
+		$CollisionShape3D.set_deferred("disabled", true)
+		process_mode = Node.PROCESS_MODE_DISABLED
+		_gone = true
+		fled.emit())
+
+
+## Mama's round is over: back on the court at the guard spot.
+func come_back() -> void:
+	_gone = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+	visible = true
+	$CollisionShape3D.set_deferred("disabled", false)
+	$PaperDoll.scale = Vector3.ONE
+	_alert.text = "!"
+	return_to_guard()
+
+
+func _do_flee(delta: float) -> void:
+	_timer += delta
+	var to := _flee_to - _flat(global_position)
+	if to.length() <= _flee_reach or _timer >= FLEE_GIVE_UP or (_timer > 1.0 and is_on_wall() and to.length() < _flee_reach + 3.0):
+		vanish()
+		return
+	_steer(to, FLEE_SPEED, delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -197,7 +268,7 @@ func _physics_process(delta: float) -> void:
 		_ring_time -= delta
 		if _ring_time <= 0.0 and state != State.WIND_UP:
 			_ring.visible = false
-	if _player and state >= State.CHASE:
+	if _player and state >= State.CHASE and state != State.FLEE:
 		_look(delta)
 
 	match state:
@@ -220,6 +291,8 @@ func _physics_process(delta: float) -> void:
 				state = State.CHASE
 		State.PICKUP:
 			_do_pickup(delta)
+		State.FLEE:
+			_do_flee(delta)
 		State.LUNGE:
 			_do_lunge(delta)
 		State.RECOVER:

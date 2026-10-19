@@ -19,6 +19,8 @@ var music := 0.8 ## 0..1
 var sfx := 1.0 ## 0..1
 var low_detail := false
 var fullscreen := false
+## On-screen joystick and buttons in the game. On by default on phones/tablets.
+var touch_controls := OS.has_feature("mobile")
 
 
 func _enter_tree() -> void:
@@ -62,6 +64,12 @@ func set_low_detail(on: bool) -> void:
 	low_detail = on
 	_apply_detail()
 	_save()
+
+
+func set_touch_controls(on: bool) -> void:
+	touch_controls = on
+	_save()
+	changed.emit()
 
 
 func set_fullscreen(on: bool) -> void:
@@ -153,6 +161,7 @@ func _save() -> void:
 	cfg.set_value("audio", "sfx", sfx)
 	cfg.set_value("video", "low_detail", low_detail)
 	cfg.set_value("video", "fullscreen", fullscreen)
+	cfg.set_value("controls", "touch", touch_controls)
 	cfg.save(PATH)
 
 
@@ -165,3 +174,4 @@ func _load() -> void:
 	sfx = cfg.get_value("audio", "sfx", sfx)
 	low_detail = cfg.get_value("video", "low_detail", low_detail)
 	fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
+	touch_controls = cfg.get_value("controls", "touch", touch_controls)

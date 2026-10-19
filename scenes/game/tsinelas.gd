@@ -85,6 +85,12 @@ func _process(delta: float) -> void:
 	_update_trail(delta)
 
 
+## Still in its first flight: hasn't touched the ground (or anything) yet.
+## A bullseye needs the lata hit while this is true.
+func is_clean() -> bool:
+	return _airborne and not _done
+
+
 ## Enchanted tsinelas: a shimmering purple trail that leaves stars in its wake.
 func set_enchanted(on: bool) -> void:
 	_enchanted = on

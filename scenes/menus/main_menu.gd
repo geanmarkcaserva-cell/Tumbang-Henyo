@@ -12,6 +12,8 @@ const SHOTS := {
 	"custom": {"pos": Vector3(-9.0, 7.5, -4.0), "look": Vector3(3.0, 0.0, -24.0), "sway": 0.7},
 	"settings": {"pos": Vector3(0.0, 10.0, 6.0), "look": Vector3(0.0, 0.0, -18.0), "sway": 1.0},
 	"credits": {"pos": Vector3(7.0, 2.2, -32.0), "look": Vector3(0.0, 4.5, -43.0), "sway": 1.0},
+	"join": {"pos": Vector3(-6.5, 3.4, 1.0), "look": Vector3(1.5, 1.5, -26.0), "sway": 1.0},
+	"host": {"pos": Vector3(8.5, 2.4, -6.0), "look": Vector3(-3.0, 2.0, -28.0), "sway": 0.8},
 	# Worm's-eye: a wide lens almost on the ground, right of the (flat) cutout and
 	# looking up past it, so its right side looms close and the left recedes.
 	"character": {"pos": Vector3(4.5, 0.28, -10.55), "look": Vector3(2.75, 1.15, -12.6), "sway": 0.05, "fov": 80.0},
@@ -51,6 +53,8 @@ var _custom_title: LineEdit
 var _custom_text: TextEdit
 var _custom_status: Label
 var _custom_delete: Button
+var _host_panel: HostPanel
+var _join_panel: JoinPanel
 var _delete_armed := false
 var _file_dialog: FileDialog
 var _help_dialog: AcceptDialog
@@ -84,11 +88,19 @@ func _ready() -> void:
 			func(): _confirm_pick("weapon", ""))
 	_panels["settings"] = _build_settings(ui)
 	_panels["credits"] = _build_simple(ui, "Credits", "Tumbang Henyo\n\nGame design, art and code by the Tumbang Henyo team.")
+	_panels["join"] = _build_join(ui)
+	_panels["host"] = _build_host(ui)
 	# A bit smaller than the layouts were drawn, each piece toward its own edge.
 	for key in _panels:
 		UiFx.shrink(_panels[key])
 	_select_theme(GameManager.selected_theme)
-	_show("main", true)
+	# Back from a class game: straight to the lobby screen.
+	if Lobby.is_host():
+		_show("host", true)
+	elif Lobby.is_client():
+		_show("join", true)
+	else:
+		_show("main", true)
 
 
 func _process(delta: float) -> void:
@@ -136,6 +148,8 @@ func _show(panel_id: String, instant: bool = false) -> void:
 	_current = panel_id
 	if panel_id == "custom":
 		_enter_custom()
+	elif panel_id == "join":
+		_join_panel.on_show()
 	for key in _panels:
 		_panels[key].visible = key == panel_id
 	if _pickers.has(panel_id):
@@ -279,6 +293,7 @@ func _build_main(ui: CanvasLayer) -> Control:
 	root.add_child(col)
 	var entries := [
 		["Start", func(): _show("mode")],
+		["Multiplayer", func(): _show("join")],
 		["Settings", func(): _show("settings")],
 		["Credits", func(): _show("credits")],
 		["Quit", func(): Transition.quit()],
@@ -456,7 +471,7 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	# Bottom: back, save, play.
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
-	row.position = Vector2(940, 935)
+	row.position = Vector2(640, 935)
 	root.add_child(row)
 	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.pressed.connect(func(): _show("mode"))
@@ -464,6 +479,10 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	var save := UiKit.button("Save", UiKit.BLUE, 44, Vector2(250, 110))
 	save.pressed.connect(_save_custom)
 	row.add_child(save)
+	# Teachers: open a class lobby with this set; students join from Multiplayer.
+	var host := UiKit.button("Host class", UiKit.BLUE, 44, Vector2(300, 110))
+	host.pressed.connect(_host_custom)
+	row.add_child(host)
 	var play := UiKit.button("Play", UiKit.GOLD, 48, Vector2(320, 110))
 	play.pressed.connect(_play_custom)
 	row.add_child(play)
@@ -631,6 +650,43 @@ func _play_custom() -> void:
 	CustomQuiz.activate(_custom_id)
 	_select_theme(CustomQuiz.theme_id(_custom_id))
 	_show("character")
+
+
+## Open a class lobby for the set in the editor (saved first).
+func _host_custom() -> void:
+	var r := _validate_custom()
+	if r.questions.is_empty():
+		_custom_status.text = "Add some questions first, then host your class."
+		_custom_status.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
+		return
+	if not _save_custom():
+		return
+	var err := _host_panel.open(_custom_id)
+	if err != "":
+		_custom_status.text = err
+		_custom_status.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
+		return
+	_show("host")
+
+
+# --- Multiplayer: class lobby screens -------------------------------------------
+
+func _build_join(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	_join_panel = JoinPanel.new()
+	_join_panel.back_pressed.connect(func(): _show("main"))
+	root.add_child(_join_panel)
+	return root
+
+
+func _build_host(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	_host_panel = HostPanel.new()
+	_host_panel.closed.connect(func(): _show("custom"))
+	root.add_child(_host_panel)
+	return root
 
 
 ## Two presses: DELETE, then SURE? (like BUY -> CONFIRM).

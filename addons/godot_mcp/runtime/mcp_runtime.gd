@@ -42,6 +42,14 @@ var _started_at_msec := 0
 
 
 func _ready() -> void:
+	# Exported builds (exe / apk) don't talk to the MCP server: only run when the
+	# game is started from the Godot editor.
+	# Also off for helper copies started with `-- --no-mcp` (e.g. a test bot
+	# running next to the editor's game).
+	if not OS.has_feature("editor") or OS.get_cmdline_user_args().has("--no-mcp"):
+		set_process(false)
+		queue_free()
+		return
 	_project_path = ProjectSettings.globalize_path("res://")
 	_started_at_msec = Time.get_ticks_msec()
 	process_mode = Node.PROCESS_MODE_ALWAYS

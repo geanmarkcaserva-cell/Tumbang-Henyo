@@ -14,6 +14,7 @@ const SHOTS := {
 	"credits": {"pos": Vector3(7.0, 2.2, -32.0), "look": Vector3(0.0, 4.5, -43.0), "sway": 1.0},
 	"join": {"pos": Vector3(-6.5, 3.4, 1.0), "look": Vector3(1.5, 1.5, -26.0), "sway": 1.0},
 	"host": {"pos": Vector3(8.5, 2.4, -6.0), "look": Vector3(-3.0, 2.0, -28.0), "sway": 0.8},
+	"achievements": {"pos": Vector3(0.0, 1.6, -34.0), "look": Vector3(0.0, 3.0, -10.0), "sway": 0.8},
 	# Worm's-eye: a wide lens almost on the ground, right of the (flat) cutout and
 	# looking up past it, so its right side looms close and the left recedes.
 	"character": {"pos": Vector3(4.5, 0.28, -10.55), "look": Vector3(2.75, 1.15, -12.6), "sway": 0.05, "fov": 80.0},
@@ -22,7 +23,7 @@ const SHOTS := {
 
 ## Where Back / Esc goes from each panel.
 const BACK_OF := {
-	"mode": "main", "settings": "main", "credits": "main", "custom": "mode",
+	"mode": "main", "settings": "main", "credits": "main", "custom": "mode", "achievements": "main",
 	"character": "mode", "weapon": "character",
 }
 
@@ -90,6 +91,7 @@ func _ready() -> void:
 	_panels["credits"] = _build_simple(ui, "Credits", "Tumbang Henyo\n\nGame design, art and code by the Tumbang Henyo team.")
 	_panels["join"] = _build_join(ui)
 	_panels["host"] = _build_host(ui)
+	_panels["achievements"] = _build_achievements(ui)
 	# A bit smaller than the layouts were drawn, each piece toward its own edge.
 	for key in _panels:
 		UiFx.shrink(_panels[key])
@@ -294,6 +296,7 @@ func _build_main(ui: CanvasLayer) -> Control:
 	var entries := [
 		["Start", func(): _show("mode")],
 		["Multiplayer", func(): _show("join")],
+		["Achievements", func(): _show("achievements")],
 		["Settings", func(): _show("settings")],
 		["Credits", func(): _show("credits")],
 		["Quit", func(): Transition.quit()],
@@ -634,6 +637,8 @@ func _save_custom() -> bool:
 	if _custom_title.text.strip_edges() == "":
 		_custom_title.text = "My quiz %d" % (CustomQuiz.list_sets().size() + 1)
 	_custom_id = CustomQuiz.save_set(_custom_title.text, _custom_text.text, _custom_id)
+	if _validate_custom().questions.size() > 0:
+		Achievements.unlock("quiz_maker")
 	_custom_delete.disabled = false
 	_refresh_custom_list()
 	_validate_custom()
@@ -677,6 +682,15 @@ func _build_join(ui: CanvasLayer) -> Control:
 	_join_panel = JoinPanel.new()
 	_join_panel.back_pressed.connect(func(): _show("main"))
 	root.add_child(_join_panel)
+	return root
+
+
+func _build_achievements(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	var panel := AchievementsPanel.new()
+	panel.back_pressed.connect(func(): _show("main"))
+	root.add_child(panel)
 	return root
 
 

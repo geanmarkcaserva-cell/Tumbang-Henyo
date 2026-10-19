@@ -95,6 +95,11 @@ var _round_progress := 0.0 ## 0..1 through this round's slice of the clock
 var _round_clean := true ## no wrong answer or miss yet this round (bullseye still possible)
 var _bullseye: Node3D
 var perfect_shots := 0
+# For achievements (see _round_achievements).
+var _streak := 0 ## right answers in a row this run
+var _round_hurt := false ## hit or tagged this round
+var _round_slipper_hit := false ## a tayas' tsinelas hit you this round
+var _mama_hit_round := false ## a hanger or walis hit you in Mama's round
 
 var _mama_on := false ## Mama's round is running
 var _mama: CharacterBody3D
@@ -155,6 +160,7 @@ func _ready() -> void:
 		_tut.setup(_hud, _player, _finish)
 
 	QuizDatabase.reset_run()
+	Achievements.add_stat("runs")
 	if Lobby.in_match():
 		# Class game: same seed for everyone, so the questions (and the wind)
 		# come in the same order for the whole class.
@@ -396,6 +402,13 @@ func _on_quiz_answered(choice_index: int) -> void:
 		_round_points += points
 		_add_caps(CAPS_CORRECT)
 		_advance_clock(CLOCK_ANSWER_STEP)
+		_streak += 1
+		Achievements.unlock("tama")
+		Achievements.add_stat("correct_total")
+		if _streak >= 10:
+			Achievements.unlock("henyo")
+		if not _tutorial_on() and _quiz.get_time_left() >= 12.0:
+			Achievements.unlock("speed_reader")
 		_hud.show_status("+%d" % points)
 		await _wait(0.8)
 		if state != State.QUIZ:
@@ -421,6 +434,7 @@ func _on_quiz_timed_out() -> void:
 
 func _answer_failed() -> void:
 	_round_clean = false
+	_streak = 0
 	_hud.show_status("")
 	_player.hurt() # squish + red flash
 	_lose_awra(AWRA_WRONG)
@@ -477,6 +491,11 @@ func _on_bullseye() -> void:
 	perfect_shots += 1
 	_round_points += POINTS_BULLSEYE
 	_hud.show_bullseye(POINTS_BULLSEYE)
+	Achievements.unlock("bullseye")
+	if perfect_shots >= 5:
+		Achievements.unlock("sharpshooter")
+	if perfect_shots >= 10:
+		Achievements.unlock("ten_hit_wonder")
 
 
 func _on_tsinelas_settled() -> void:
@@ -521,6 +540,9 @@ func _on_lata_knocked_down() -> void:
 	if state == State.THROW:
 		_round_points += POINTS_HIT
 		_advance_clock(CLOCK_HIT_STEP)
+		Achievements.unlock("tumba")
+		if _wind.length() >= 4.0:
+			Achievements.unlock("windy")
 		_throw.end()
 		_enter_run()
 
@@ -572,6 +594,8 @@ func _on_taya_lata_reset() -> void:
 func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
 	if state != State.RUN:
 		return
+	_round_hurt = true
+	_round_slipper_hit = true
 	var practice := _tutorial_on()
 	_lose_awra(AWRA_SLIPPER_HIT)
 	if state == State.GAME_OVER:
@@ -586,6 +610,7 @@ func _on_tagged() -> void:
 	if state != State.RUN:
 		return
 	_set_state(State.TAGGED)
+	_round_hurt = true
 	_set_player_mode(false, false)
 	_hud.set_context("none")
 	_stop_tayas()
@@ -622,10 +647,15 @@ func _round_clear() -> void:
 	_stop_tayas()
 	_player.celebrate(-1.0) # until the next round respawns them
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_round_achievements()
 	awra = mini(awra + AWRA_ROUND_CLEAR, MAX_AWRA)
 	_hud.set_awra(awra, MAX_AWRA)
 	var gained := int(round((_round_points + POINTS_ROUND_CLEAR) * (1.0 + 0.1 * (round_number - 1))))
 	score += gained
+	if score >= 10000:
+		Achievements.unlock("big_score")
+	if score >= 15000:
+		Achievements.unlock("legend")
 	_round_points = 0
 	_hud.set_score(score)
 	_add_caps(CAPS_ROUND_CLEAR)
@@ -646,6 +676,9 @@ func _round_clear() -> void:
 	round_number += 1
 	_round_progress = 0.0
 	_round_clean = true
+	_round_hurt = false
+	_round_slipper_hit = false
+	_mama_hit_round = false
 	_hud.set_round(round_number)
 	_hud.set_clock(_clock_minutes())
 	_hud.show_status("")
@@ -666,6 +699,25 @@ func _round_clear() -> void:
 			_hud.show_tip("Two tayas", "One resets the lata, one chases you. Sprint early!", 6.0)
 	await _wait(0.15) # one beat of black so the jump isn't visible
 	_hud.fade_in(FADE_TIME)
+
+
+## Round cleared: hand out what this round earned.
+func _round_achievements() -> void:
+	Achievements.unlock("takbo")
+	if _round_clean and not _round_hurt:
+		Achievements.unlock("flawless")
+	if not _mama_on:
+		if _tayas.size() >= 3 and not _round_slipper_hit:
+			Achievements.unlock("untouchable")
+		for t in _tayas:
+			if t.elite:
+				Achievements.unlock("elite")
+	else:
+		Achievements.unlock("nakauwi")
+		if not _mama_hit_round:
+			Achievements.unlock("hanger_dodger")
+	if awra <= 15 and not _tutorial_on():
+		Achievements.unlock("last_breath")
 
 
 ## After a miss or a tag: fade to black, everyone back to their spots, and
@@ -745,6 +797,8 @@ func _game_over() -> void:
 		_report_class() # final score, marked out
 		await get_tree().create_timer(0.6).timeout # let the board catch up
 		_hud.set_class_result(Lobby.my_rank(), Lobby.players.size())
+		if Lobby.my_rank() == 1 and Lobby.players.size() >= 2:
+			Achievements.unlock("class_champ")
 
 
 # --- Mama's round (round 15, 6:00 PM) ---------------------------------------------
@@ -759,6 +813,7 @@ func _game_over() -> void:
 ## Called on the black screen after round 14 is cleared.
 func _begin_mama_round() -> void:
 	_mama_on = true
+	Achievements.unlock("mamas_home")
 	_set_player_mode(false, false)
 	_hud.set_context("none")
 	var barangay := _barangay()
@@ -902,6 +957,7 @@ func _on_mama_caught() -> void:
 ## Caught by Mama, or too late: lose Awra and try the round again.
 func _mama_failed(caught: bool) -> void:
 	_set_state(State.TAGGED)
+	_round_hurt = true
 	_set_player_mode(false, false)
 	_hud.set_context("none")
 	_hud.show_boss_timer(false)
@@ -924,6 +980,8 @@ func _mama_failed(caught: bool) -> void:
 func _on_mama_hit() -> void:
 	if state != State.RUN or not _mama_on:
 		return
+	_round_hurt = true
+	_mama_hit_round = true
 	_lose_awra(AWRA_MAMA_HIT)
 	if state == State.GAME_OVER:
 		return

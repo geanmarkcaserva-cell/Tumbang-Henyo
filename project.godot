@@ -26,6 +26,7 @@ Sfx="*res://autoload/sfx.gd"
 Music="*res://autoload/music.gd"
 Settings="*res://autoload/settings.gd"
 Lobby="*res://autoload/lobby.gd"
+Achievements="*res://autoload/achievements.gd"
 
 [display]
 

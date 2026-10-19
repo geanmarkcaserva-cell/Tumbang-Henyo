@@ -216,6 +216,7 @@ func on_round_clear() -> void:
 		"width": 1000.0,
 	})
 	_hud.highlight("")
+	Achievements.unlock("first_steps")
 	await _answered
 	_finish_up()
 

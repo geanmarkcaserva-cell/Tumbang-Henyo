@@ -1167,11 +1167,11 @@ class BeaconMarker extends Control:
 		var area := Rect2(Vector2(MARGIN, MARGIN), vp - Vector2(MARGIN, MARGIN) * 2.0)
 		if not behind and area.has_point(sp):
 			var bob := sin(_t * 5.0) * 7.0
-			var tip := sp + Vector2(0, bob)
-			var tri := PackedVector2Array([tip + Vector2(-20, -26), tip + Vector2(20, -26), tip])
+			var point := sp + Vector2(0, bob)
+			var tri := PackedVector2Array([point + Vector2(-20, -26), point + Vector2(20, -26), point])
 			draw_colored_polygon(tri, COL)
 			draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[0]]), Color(0.05, 0.1, 0.15), 3.0, true)
-			_text(font, tip + Vector2(0, -40), text)
+			_text(font, point + Vector2(0, -40), text)
 			return
 		# Off screen: arrow on the edge, pointing the way.
 		var centre := vp * 0.5

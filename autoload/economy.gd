@@ -119,12 +119,15 @@ func buy(item_id: String, price: int) -> bool:
 	owned[item_id] = true
 	save_profile()
 	caps_changed.emit(caps)
+	Achievements.unlock("shopper")
 	return true
 
 
 func add_caps(amount: int) -> void:
 	caps += amount
 	caps_changed.emit(caps)
+	if caps >= 1000:
+		Achievements.unlock("collector")
 
 
 func equip(kind: String, item_id: String) -> void:

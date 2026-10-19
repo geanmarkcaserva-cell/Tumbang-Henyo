@@ -27,6 +27,14 @@ const TRAIL_STEP := 0.8
 const TRAIL_MAX := 300
 const PROJECTILE_SPEED := 17.0
 const AIM_SCATTER := 0.7
+## Shout text -> her recorded line (drop the files into art/Audio/sfx).
+const SHOUT_VOICES := {
+	"HOY! HALIKA DITO!": "voice_mama_halika",
+	"HOY!": "voice_mama_hoy",
+	"HALIKA DITO!": "voice_mama_halika",
+	"LAGOT KA!": "voice_mama_lagot",
+	"UWI NA!": "voice_mama_uwi",
+}
 
 ## The sprite: 18 x 30, belt raised over her head. Two front frames (belt
 ## swinging), one from behind.
@@ -237,6 +245,10 @@ func _process(delta: float) -> void:
 func _shout_now(text: String) -> void:
 	_shout.text = text
 	_shout_t = 0.0
+	# Her voice, once recorded (art/Audio/sfx/voice_mama_*.wav; silent until then).
+	var voice: String = SHOUT_VOICES.get(text, "")
+	if voice != "":
+		Sfx.play_at(voice, global_position, 6.0, 1.0, 0.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -361,6 +373,7 @@ func _throw() -> void:
 	aim += lead + scatter
 	var g := Vector3(0.0, -PROJECTILE.GRAVITY, 0.0)
 	var vel := (aim - origin - 0.5 * g * t * t) / t
+	Sfx.play_at("throw_heavy", global_position, 2.0)
 	var p = PROJECTILE.new()
 	p.kind = _next_kind
 	_next_kind = 1 - _next_kind

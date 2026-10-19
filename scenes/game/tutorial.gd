@@ -43,6 +43,10 @@ var _retry := false ## the next throw is a second try (short card)
 var _lata_up := false
 
 
+func _exit_tree() -> void:
+	Achievements.paused = false # quit to the menu mid-tutorial
+
+
 func setup(hud: CanvasLayer, player: CharacterBody3D, finish: Node3D) -> void:
 	_hud = hud
 	_player = player
@@ -52,6 +56,7 @@ func setup(hud: CanvasLayer, player: CharacterBody3D, finish: Node3D) -> void:
 ## Show the welcome card. await it: returns when the player starts or skips.
 func start() -> void:
 	running = true
+	Achievements.paused = true # practice round: nothing unlocks
 	_hud.set_tutorial_running(true)
 	_hud.coach.button_pressed.connect(func(id: String): _answered.emit(id))
 	_hud.coach.skip_pressed.connect(skip)
@@ -216,9 +221,10 @@ func on_round_clear() -> void:
 		"width": 1000.0,
 	})
 	_hud.highlight("")
-	Achievements.unlock("first_steps")
 	await _answered
 	_finish_up()
+	# Training is over now, so this is the first one that can unlock.
+	Achievements.unlock("first_steps")
 
 
 # --- Step logic ---------------------------------------------------------------------
@@ -311,6 +317,7 @@ func _go(s: Step) -> void:
 
 func _finish_up() -> void:
 	running = false
+	Achievements.paused = false
 	Economy.tutorial_done = true
 	Economy.save_profile()
 	_hud.set_tutorial_running(false)

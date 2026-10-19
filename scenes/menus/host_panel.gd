@@ -18,6 +18,7 @@ var _board: ClassBoard
 var _close_armed := false
 var _played := false ## at least one game finished in this lobby
 var _t := 0.0
+var _last_count := 0 ## students in the lobby last refresh (a join plays a blip)
 
 
 func _ready() -> void:
@@ -129,6 +130,9 @@ func _refresh() -> void:
 	_id_label.text = Lobby.pretty_id() if Lobby.is_host() else "---"
 	_quiz_label.text = Lobby.quiz_title
 	var n := _active_count()
+	if n > _last_count:
+		Sfx.play("join") # a student joined
+	_last_count = n
 	_count_label.text = "%d student%s in" % [n, "" if n == 1 else "s"]
 	_start.visible = not Lobby.match_on
 	_end.visible = Lobby.match_on
@@ -152,6 +156,7 @@ func _refresh() -> void:
 
 
 func _on_start() -> void:
+	Sfx.play("whistle") # game on!
 	_close_armed = false
 	_close.text = "Close lobby"
 	Lobby.start_match()

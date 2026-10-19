@@ -17,6 +17,9 @@ const HIGH := 3.6
 var wind := Vector3.ZERO
 var follow: Node3D ## the player: the box sits in front of them
 
+const BASE_TINT := Color(0.92, 0.92, 0.92)
+
+var _mat: StandardMaterial3D
 var _leaves: Array = []
 var _mm := MultiMesh.new()
 var _fade := 0.0 ## 0..1, all leaves together (fade in/out with the wind)
@@ -40,10 +43,17 @@ func _ready() -> void:
 	# Unlit: a leaf seen from behind against the sun would otherwise turn into a
 	# dark blob. The two-tone halves and the tumbling still give it shape.
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(0.92, 0.92, 0.92)
+	mat.albedo_color = BASE_TINT
 	mmi.material_override = mat
+	_mat = mat
 	add_child(mmi)
 	top_level = true
+
+
+## The leaves are unlit, so the day/night cycle darkens them by hand.
+func set_tint(c: Color) -> void:
+	if _mat:
+		_mat.albedo_color = Color(BASE_TINT.r * c.r, BASE_TINT.g * c.g, BASE_TINT.b * c.b)
 
 
 ## New wind for this throw. Zero wind: the leaves settle away.

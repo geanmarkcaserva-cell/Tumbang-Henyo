@@ -156,6 +156,8 @@ func _show(panel_id: String, instant: bool = false) -> void:
 		_panels[key].visible = key == panel_id
 	if _pickers.has(panel_id):
 		_open_picker(panel_id)
+	if changed and not instant:
+		Sfx.play("ui_whoosh") # the camera glides to the next spot on the court
 	if changed:
 		# The new panel springs in piece by piece; the logo drops in on its own.
 		UiFx.pop_in(_panels[panel_id], 0.05)
@@ -868,6 +870,7 @@ func _on_buy(kind: String) -> void:
 	if not p.confirm:
 		p.confirm = true # first press asks to confirm
 	elif Economy.buy(item.id, item.price):
+		Sfx.play("ui_buy") # ka-ching
 		p.confirm = false
 		Economy.equip(_slot(kind), item.id)
 		_refresh_picker(kind)
@@ -884,6 +887,7 @@ func _confirm_pick(kind: String, next_panel: String) -> void:
 	if not Economy.owns(item.id):
 		return
 	Economy.equip(_slot(kind), item.id)
+	Sfx.play("ui_equip")
 	if kind == "character":
 		_char_celebrate() # cheers while the camera moves to weapon select
 	if next_panel == "":

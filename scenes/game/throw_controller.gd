@@ -67,6 +67,7 @@ func begin(player: Node3D, wind_vec: Vector3, preview_frac: float) -> void:
 func end() -> void:
 	active = false
 	_charging = false
+	Sfx.stop_loop("charge")
 	_preview_mesh.clear_surfaces()
 	power = 0.0
 	power_changed.emit(power)
@@ -91,6 +92,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("throw") and not _charging:
 		_charging = true
 		_charge_time = 0.0
+		Sfx.start_loop("charge", -4.0, 0.8) # hum that rises and falls with the power
 		get_viewport().set_input_as_handled()
 	elif event.is_action_released("throw") and _charging:
 		_charging = false
@@ -103,6 +105,7 @@ func _process(delta: float) -> void:
 		return
 	_charge_time += delta
 	power = pingpong(_charge_time * charge_cycles_per_sec * 2.0, 1.0)
+	Sfx.set_loop("charge", -4.0, 0.8 + power * 0.9)
 	power_changed.emit(power)
 	_draw_preview()
 
@@ -223,6 +226,8 @@ func debug_throw_at(target: Vector3, flight_time: float = 0.7) -> void:
 
 func _launch(forced_velocity: Variant = null) -> void:
 	active = false
+	Sfx.stop_loop("charge")
+	Sfx.play("throw", 0.0, 0.9 + power * 0.25, 0.04) # harder throw, sharper whoosh
 	_preview_mesh.clear_surfaces()
 	var velocity: Vector3 = forced_velocity if forced_velocity != null else _launch_velocity()
 	var origin: Vector3 = _player.get_throw_origin()

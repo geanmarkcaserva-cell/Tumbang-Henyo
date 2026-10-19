@@ -28,6 +28,7 @@ const AWRA_SLIPPER_HIT := 10
 const AWRA_ROUND_CLEAR := 10
 const CAPS_CORRECT := 2 ## tansan per correct answer (GDD: Economy and shop)
 const CAPS_ROUND_CLEAR := 10
+const CAPS_VICTORY := 50 ## beating Mama's round (the whole game)
 const SLIPPER_STAGGER_TIME := 0.5
 const SLIPPER_KNOCKBACK := 4.0
 ## Every taya (elite too) runs at this multiple of the player's walk speed:
@@ -52,8 +53,10 @@ const THROW_ZONE := Rect2(-8.6, -5.6, 17.2, 3.6)
 
 ## Clock: the time of day moves forward whenever you score. Round 1 starts at
 ## 8:00 AM and round 15 at 6:00 PM, when Mama comes home.
-const CLOCK_START := 8.0 * 60.0
-const CLOCK_MAMA := 18.0 * 60.0
+const CLOCK_START := 17.0 * 60.0 ## 5:00 PM: golden hour on the court
+const CLOCK_MAMA := 18.0 * 60.0 ## 6:00 PM: Mama comes home (the last round)
+const DAY_NIGHT := preload("res://scenes/game/day_night.gd")
+const HINT_COST := 100 ## tansan for a hint: steep on purpose, studying is cheaper
 const CLOCK_ANSWER_STEP := 0.3 ## share of a round's time for a right answer
 const CLOCK_HIT_STEP := 0.3 ## ...and for knocking the lata down
 const CLOCK_ROUND_CAP := 0.9 ## the rest of the slice comes with the round clear
@@ -106,9 +109,8 @@ var _mama: CharacterBody3D
 var _beacon: Node3D
 var _goal: Dictionary = {} ## the house to reach (from Barangay.house_boxes())
 var _mama_left := 0.0
-var _sun: DirectionalLight3D
-var _sun_colour := Color.WHITE
-var _sun_energy := 1.0
+var _mama_tick_shown := -1 ## last whole second that ticked
+var _sky_cycle: Node ## day_night.gd: the sky follows the clock
 
 @onready var _player: CharacterBody3D = $Player
 @onready var _hud: CanvasLayer = $HUD
@@ -131,6 +133,7 @@ func _ready() -> void:
 	_finish.body_entered.connect(_on_finish_body_entered)
 	_quiz.answered.connect(_on_quiz_answered)
 	_quiz.timed_out.connect(_on_quiz_timed_out)
+	_quiz.hint_requested.connect(_on_hint_requested)
 	_throw.power_changed.connect(_hud.set_power)
 	_throw.thrown.connect(_on_thrown)
 	_throw.settled.connect(_on_tsinelas_settled)
@@ -173,7 +176,15 @@ func _ready() -> void:
 	_hud.set_score(score)
 	_hud.set_caps(Economy.caps)
 	_hud.update_wind(Vector3.ZERO, _player.global_basis)
-	_hud.set_clock(_clock_minutes(), true)
+	_sky_cycle = DAY_NIGHT.new()
+	_sky_cycle.name = "DayNight"
+	add_child(_sky_cycle)
+	var barangay := _barangay()
+	Sfx.start_loop("crickets", -30.0) # louder as it gets dark (_on_sky_tint)
+	_sky_cycle.tint_changed.connect(_leaves.set_tint)
+	_sky_cycle.tint_changed.connect(_on_sky_tint)
+	_sky_cycle.setup($Arena/WorldEnvironment, $Arena/Sun, barangay.lamp_spots() if barangay else [])
+	_update_clock(true)
 	_begin()
 
 
@@ -188,6 +199,16 @@ func _begin() -> void:
 
 func _tutorial_on() -> bool:
 	return _tut != null and _tut.running
+
+
+func _exit_tree() -> void:
+	Sfx.stop_all_loops() # wind, crickets, charge
+
+
+## Crickets fade up as the sky darkens (a few at golden hour, a chorus by 6 PM).
+func _on_sky_tint(tint: Color) -> void:
+	var night := clampf(1.0 - (tint.v - 0.3) / 0.65, 0.0, 1.0)
+	Sfx.set_loop("crickets", lerpf(-30.0, -6.0, night))
 
 
 ## Lock the mouse for aiming (not with touch controls: fingers need the cursor free).
@@ -240,7 +261,15 @@ func _clock_minutes() -> float:
 ## Scored something: the clock ticks forward (never into the next round).
 func _advance_clock(step: float) -> void:
 	_round_progress = minf(_round_progress + step, CLOCK_ROUND_CAP)
-	_hud.set_clock(_clock_minutes())
+	_update_clock()
+
+
+## Clock on the HUD and the sky both follow the time of day.
+func _update_clock(instant: bool = false) -> void:
+	var minutes := _clock_minutes()
+	_hud.set_clock(minutes, instant)
+	if _sky_cycle:
+		_sky_cycle.set_time(minutes, instant)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -387,6 +416,8 @@ func _enter_quiz() -> void:
 	_correct_index = order.find(_question.answer)
 	_quiz.time_limit = _tut.quiz_time_limit() if _tutorial_on() else QUIZ_TIME
 	_quiz.ask(_question.question, choices)
+	# Hints cost real tansan; none in the free practice round.
+	_quiz.set_hint(not _tutorial_on(), HINT_COST, Economy.caps >= HINT_COST)
 	if _tutorial_on():
 		_tut.on_quiz_shown()
 
@@ -421,6 +452,18 @@ func _on_quiz_answered(choice_index: int) -> void:
 			_enter_throw()
 	else:
 		_answer_failed()
+
+
+## Hint: pay 100 tansan to cross out one wrong choice (once per question).
+func _on_hint_requested() -> void:
+	if state != State.QUIZ or Economy.caps < HINT_COST or not _quiz.can_hint():
+		return
+	Economy.add_caps(-HINT_COST)
+	Economy.save_profile()
+	var wrong := [0, 1, 2].filter(func(i): return i != _correct_index)
+	_quiz.eliminate(wrong.pick_random())
+	Sfx.play("hint")
+	_hud.show_status("Hint: one wrong answer crossed out.  -%d tansan" % HINT_COST)
 
 
 func _on_quiz_timed_out() -> void:
@@ -463,6 +506,8 @@ func _enter_throw() -> void:
 	_hud.update_wind(_wind, _player.global_basis)
 	_leaves.set_wind(_wind)
 	_leaves.set_active(true)
+	if _wind.length() > 0.05: # wind you can hear, stronger = louder
+		Sfx.fade_loop("wind", lerpf(-16.0, 0.0, clampf(_wind.length() / 6.0, 0.0, 1.0)), 0.8)
 	if _tutorial_on():
 		_hud.show_status("")
 		_tut.on_throw_begin()
@@ -489,6 +534,7 @@ func _on_thrown() -> void:
 ## (the slow-motion close-up is BullseyeCam's job).
 func _on_bullseye() -> void:
 	perfect_shots += 1
+	Sfx.play("bullseye")
 	_round_points += POINTS_BULLSEYE
 	_hud.show_bullseye(POINTS_BULLSEYE)
 	Achievements.unlock("bullseye")
@@ -524,6 +570,7 @@ func _on_throw_missed() -> void:
 	_lose_awra(AWRA_MISS)
 	if state == State.GAME_OVER:
 		return
+	Sfx.play("miss")
 	_hud.show_status("Sablay! Missed the lata.")
 	_player.controls_enabled = false
 	if practice:
@@ -539,6 +586,7 @@ func _on_throw_missed() -> void:
 func _on_lata_knocked_down() -> void:
 	if state == State.THROW:
 		_round_points += POINTS_HIT
+		Sfx.play("voice_tumba") # recorded shout, once the file exists
 		_advance_clock(CLOCK_HIT_STEP)
 		Achievements.unlock("tumba")
 		if _wind.length() >= 4.0:
@@ -564,6 +612,7 @@ func _enter_run() -> void:
 		_hud.show_status("")
 		_tut.on_run()
 	else:
+		Sfx.play("voice_takbo")
 		var who := "the taya" if _tayas.size() == 1 else "a taya"
 		_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
 	var speed_ratio := TUTORIAL_TAYA_SPEED_RATIO if practice else TAYA_SPEED_RATIO
@@ -583,6 +632,7 @@ func _enter_run() -> void:
 func _on_taya_lata_reset() -> void:
 	if state != State.RUN:
 		return
+	Sfx.play("lata_set")
 	for t in _tayas:
 		t.start_chase()
 	if _tutorial_on():
@@ -596,6 +646,8 @@ func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
 		return
 	_round_hurt = true
 	_round_slipper_hit = true
+	Sfx.play("slap", 0.0, 1.0, 0.06)
+	Sfx.play("voice_aray")
 	var practice := _tutorial_on()
 	_lose_awra(AWRA_SLIPPER_HIT)
 	if state == State.GAME_OVER:
@@ -611,6 +663,8 @@ func _on_tagged() -> void:
 		return
 	_set_state(State.TAGGED)
 	_round_hurt = true
+	Sfx.play("tagged")
+	Sfx.play("voice_taya_ka")
 	_set_player_mode(false, false)
 	_hud.set_context("none")
 	_stop_tayas()
@@ -646,6 +700,7 @@ func _round_clear() -> void:
 	_hud.set_context("none")
 	_stop_tayas()
 	_player.celebrate(-1.0) # until the next round respawns them
+	Sfx.play("round_clear")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_round_achievements()
 	awra = mini(awra + AWRA_ROUND_CLEAR, MAX_AWRA)
@@ -679,8 +734,8 @@ func _round_clear() -> void:
 	_round_hurt = false
 	_round_slipper_hit = false
 	_mama_hit_round = false
-	_hud.set_round(round_number)
-	_hud.set_clock(_clock_minutes())
+	_hud.set_round(round_number, round_number == MAMA_ROUND)
+	_update_clock()
 	_hud.show_status("")
 	if _mama_on:
 		_end_mama_round() # Mama's calmed down: the tayas come back out
@@ -765,6 +820,8 @@ func _reset_field() -> void:
 
 
 func _add_caps(amount: int) -> void:
+	if amount > 0:
+		Sfx.play("coin", -3.0, 1.0, 0.05)
 	_run_caps += amount
 	Economy.add_caps(amount)
 
@@ -778,8 +835,12 @@ func _lose_awra(amount: int) -> void:
 		_game_over()
 
 
-func _game_over() -> void:
+## won = made it home in Mama's round (the end of the game).
+func _game_over(won: bool = false) -> void:
 	_set_state(State.GAME_OVER)
+	if not won: # the win already played its fanfare in _victory()
+		Sfx.play("game_over")
+	Sfx.stop_loop("charge")
 	Economy.save_profile() # bank the tansan earned this run
 	_quiz.close()
 	_bullseye.cancel()
@@ -790,9 +851,9 @@ func _game_over() -> void:
 	_hud.show_throw_ui(false)
 	_set_player_mode(false, false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var rounds_cleared := round_number - 1
+	var rounds_cleared := round_number if won else round_number - 1
 	var rank := GameManager.submit_score(theme_id, score, rounds_cleared)
-	_hud.show_game_over(score, rounds_cleared, _run_caps, rank, GameManager.best_score(theme_id))
+	_hud.show_game_over(score, rounds_cleared, _run_caps, rank, GameManager.best_score(theme_id), won)
 	if Lobby.is_client():
 		_report_class() # final score, marked out
 		await get_tree().create_timer(0.6).timeout # let the board catch up
@@ -837,10 +898,11 @@ func _begin_mama_round() -> void:
 		_arena.add_child(_beacon)
 	_beacon.global_position = _goal.centre
 	_beacon.visible = false
-	_dusk(true)
 	await _wait(0.15)
 	_hud.fade_in(FADE_TIME)
 	_hud.show_banner("6:00 PM", "Mama's home!", Color(1.0, 0.42, 0.36), 2.2)
+	Sfx.play("bell")
+	Sfx.play("mama_sting", -2.0)
 	await _wait(0.7)
 	_send_tayas_home()
 	await _wait(2.4)
@@ -865,7 +927,6 @@ func _end_mama_round() -> void:
 	var barangay := _barangay()
 	if barangay:
 		barangay.set_open_world(false)
-	_dusk(false)
 	for t in _tayas:
 		t.come_back()
 	_ensure_tayas()
@@ -908,7 +969,7 @@ func _pick_goal_house() -> Dictionary:
 func _enter_mama_run() -> void:
 	_set_state(State.RUN)
 	_set_player_mode(true, true)
-	_player.set_move_bounds(MAMA_AREA)
+	_player.set_move_bounds(MAMA_AREA, true)
 	_hud.show_throw_ui(false)
 	_hud.set_context("run")
 	_leaves.set_active(false)
@@ -919,12 +980,19 @@ func _enter_mama_run() -> void:
 	_hud.show_boss_timer(true)
 	_hud.set_boss_time(_mama_left)
 	_hud.show_status("Takbo! Run home to the light!")
+	_mama_tick_shown = -1
+	Music.play("mama")
 	_mama.start_chase()
 
 
 func _mama_tick(delta: float) -> void:
 	_mama_left -= delta
 	_hud.set_boss_time(_mama_left)
+	# Ticks for the last 10 seconds, sharper for the last 5.
+	var whole := int(ceil(_mama_left))
+	if whole != _mama_tick_shown and whole <= 10 and whole > 0:
+		_mama_tick_shown = whole
+		Sfx.play("tick_urgent" if whole <= 5 else "tick")
 	if _at_goal():
 		_mama_success()
 	elif _mama_left <= 0.0:
@@ -945,8 +1013,32 @@ func _mama_success() -> void:
 	_hud.show_boss_timer(false)
 	_hud.set_beacon(null)
 	_round_points += POINTS_MAMA
-	_hud.show_banner("Phew!", "Mama's calmed down.", Color(0.55, 0.92, 1.0), 1.8)
-	_round_clear()
+	_victory()
+
+
+## Home before Mama caught you: Mama's round is the last one, so this wins
+## the game. Bank the round like a normal clear, then the victory screen.
+func _victory() -> void:
+	_set_state(State.ROUND_CLEAR)
+	_set_player_mode(false, false)
+	_hud.set_context("none")
+	_player.celebrate(-1.0)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_round_achievements()
+	var gained := int(round((_round_points + POINTS_ROUND_CLEAR) * (1.0 + 0.1 * (round_number - 1))))
+	score += gained
+	_round_points = 0
+	_hud.set_score(score)
+	_add_caps(CAPS_VICTORY)
+	if score >= 10000:
+		Achievements.unlock("big_score")
+	if score >= 15000:
+		Achievements.unlock("legend")
+	Sfx.play("victory")
+	_hud.show_banner("Nakauwi ka na!", "Mama's not angry anymore.  +%d points" % gained, Color(0.55, 0.92, 1.0), 2.6)
+	await _wait(3.4)
+	if state == State.ROUND_CLEAR:
+		_game_over(true)
 
 
 func _on_mama_caught() -> void:
@@ -967,7 +1059,9 @@ func _mama_failed(caught: bool) -> void:
 	_lose_awra(AWRA_MAMA_CAUGHT if caught else AWRA_MAMA_LATE)
 	if state == State.GAME_OVER:
 		return
+	Sfx.play("palo" if caught else "timeout")
 	if caught:
+		Sfx.play("voice_mama_palo")
 		_hud.show_banner("PALO!", "Mama caught you.  -%d Awra" % AWRA_MAMA_CAUGHT, Color(1.0, 0.42, 0.36), 1.4)
 	else:
 		_hud.show_banner("Too late!", "Mama's still angry.  -%d Awra" % AWRA_MAMA_LATE, Color(1.0, 0.42, 0.36), 1.4)
@@ -982,6 +1076,8 @@ func _on_mama_hit() -> void:
 		return
 	_round_hurt = true
 	_mama_hit_round = true
+	Sfx.play("slap", 0.0, 0.85, 0.06)
+	Sfx.play("voice_aray")
 	_lose_awra(AWRA_MAMA_HIT)
 	if state == State.GAME_OVER:
 		return
@@ -989,20 +1085,6 @@ func _on_mama_hit() -> void:
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
 	_hud.show_status("Aray! -%d Awra" % AWRA_MAMA_HIT)
-
-
-## 6 PM light: the sun goes low and orange for Mama's round.
-func _dusk(on: bool) -> void:
-	if _sun == null:
-		var lights := find_children("*", "DirectionalLight3D", true, false)
-		if lights.is_empty():
-			return
-		_sun = lights[0]
-		_sun_colour = _sun.light_color
-		_sun_energy = _sun.light_energy
-	var t := create_tween().set_parallel()
-	t.tween_property(_sun, "light_color", _sun_colour.lerp(Color(1.0, 0.55, 0.3), 0.55) if on else _sun_colour, 1.5)
-	t.tween_property(_sun, "light_energy", _sun_energy * (0.7 if on else 1.0), 1.5)
 
 
 # --- Pause ----------------------------------------------------------------------
@@ -1014,6 +1096,7 @@ func _on_pause_requested() -> void:
 		_resume()
 	else:
 		get_tree().paused = true
+		Sfx.play("ui_pause")
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_hud.show_pause(true)
 
@@ -1048,4 +1131,7 @@ func _wait(seconds: float) -> Signal:
 
 func _set_state(new_state: State) -> void:
 	state = new_state
+	if new_state != State.THROW:
+		Sfx.fade_loop("wind", -80.0, 0.8) # wind is only heard on the throw line
+		Sfx.stop_loop("charge")
 	print("Round %d: %s" % [round_number, State.keys()[new_state]])

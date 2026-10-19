@@ -364,6 +364,7 @@ func _h_welcome(id: String, title: String, theme: String, questions: Array, runn
 	my_name = final_name
 	QuizDatabase.set_custom_questions(theme, questions)
 	Achievements.unlock("classmate")
+	Sfx.play("join") # you're in the class
 	match_on = running
 	match_seed = seed_value
 	joined.emit()

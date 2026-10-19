@@ -205,6 +205,7 @@ func show_card(d: Dictionary) -> void:
 
 ## A step was done: green tick, "Nice!", a little bounce. await it to wait.
 func nice(text: String = "Nice!") -> Signal:
+	Sfx.play("ui_equip") # tutorial step done: a bright little "ding-ding"
 	_check.visible = true
 	_title.text = text
 	_title.add_theme_color_override("font_color", GOOD)
@@ -238,6 +239,7 @@ func _open() -> void:
 		_tween.kill()
 	modulate.a = 1.0
 	if not was:
+		Sfx.play("ui_pop") # tips and tutorial cards pop in
 		UiFx.pop(self, 0.0, 0.75, 0.45)
 	else:
 		scale = UiFx.base_of(self)

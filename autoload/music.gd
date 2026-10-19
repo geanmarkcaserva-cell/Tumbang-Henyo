@@ -6,9 +6,16 @@ extends Node
 ## To give gameplay its own song later: put the file in art/Audio and change
 ## the "game" entry below.
 
+## Drop a file at a track's path and it's used; until then the track falls
+## back to FALLBACK (see docs/AUDIO.md).
 const TRACKS := {
 	"menu": "res://art/Audio/Bg music default.mp3",
-	"game": "res://art/Audio/Bg music default.mp3", # TODO: gameplay song
+	"game": "res://art/Audio/music/game.ogg", # gameplay song (not made yet)
+	"mama": "res://art/Audio/music/mama_chase.ogg", # Mama's chase (not made yet)
+}
+const FALLBACK := {
+	"game": "menu",
+	"mama": "game",
 }
 @export var volume_db := -8.0 ## a bit under the sound effects
 const FADE := 1.2
@@ -31,6 +38,9 @@ func _ready() -> void:
 
 func play(track: String) -> void:
 	var path: String = TRACKS.get(track, "")
+	while path != "" and not ResourceLoader.exists(path) and FALLBACK.has(track):
+		track = FALLBACK[track]
+		path = TRACKS.get(track, "")
 	if path == "" or path == _current_path:
 		return
 	var stream := load(path) as AudioStream

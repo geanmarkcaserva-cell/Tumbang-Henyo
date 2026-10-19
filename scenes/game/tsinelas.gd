@@ -217,6 +217,8 @@ func _physics_process(delta: float) -> void:
 		return
 	_time += delta
 	if get_contact_count() > 0:
+		if _airborne: # first touch: slaps the concrete
+			Sfx.play_at("slap_ground", global_position, 0.0 if target_group == "lata" else -4.0)
 		_airborne = false
 	if _airborne:
 		apply_central_force(_wind_accel * mass)
@@ -237,6 +239,7 @@ func _on_hit_zone_body_entered(body: Node3D) -> void:
 			and linear_velocity.length() >= MIN_HIT_SPEED and body.has_method("hurt"):
 		_hurt_bodies.append(body)
 		body.hurt()
+		Sfx.play_at("bonk", body.global_position)
 	if _has_hit or not body.is_in_group(target_group):
 		return
 	if linear_velocity.length() < MIN_HIT_SPEED:

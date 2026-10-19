@@ -83,7 +83,7 @@ func _slider_row(text: String, value: float, setter: Callable, preview_sfx: bool
 		pct.text = "%d%%" % int(x)
 		setter.call(x / 100.0))
 	if preview_sfx:
-		slider.drag_ended.connect(func(_changed: bool): Sfx.play("correct", -6.0))
+		slider.drag_ended.connect(func(_changed: bool): Sfx.play("coin"))
 	return row
 
 

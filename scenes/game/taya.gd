@@ -434,10 +434,12 @@ func _start_wind_up(distance: float) -> void:
 	_ring.global_position = _throw_target
 	_ring.visible = true
 	_show_alert(true)
+	Sfx.play_at("alert", global_position, 4.0, 1.0, 0.03) # the "!" warning: a throw is coming
 
 
 func _throw() -> void:
 	_show_alert(false)
+	Sfx.play_at("throw", global_position, 0.0, 0.85)
 	var origin := global_transform * Vector3(0.35, 1.45, -0.35)
 	var flight_time := _flight_time(origin.distance_to(_throw_target))
 	if elite:

@@ -9,8 +9,12 @@ extends CanvasLayer
 signal unlocked(id: String)
 
 const SAVE_PATH := "user://achievements.cfg"
+## Testing: wipe every achievement each time the game starts, so they can
+## all be earned again. Set to false for release.
+const RESET_ON_LAUNCH := true
 const SHOW_TIME := 4.2 ## seconds each popup stays up
 const SLIDE_TIME := 0.35
+const CHIME_PATH := "res://art/Audio/sfx/achievement.wav"
 
 ## tier: bronze / silver / gold / platinum. secret: name and text hidden until unlocked.
 ## stat + goal: unlocks by itself when that running total reaches goal.
@@ -51,6 +55,10 @@ const LIST := [
 	{"id": "class_champ", "name": "Class Champion", "desc": "Finish first in a class game.", "tier": "gold"},
 ]
 
+## True during the tutorial's practice round: nothing unlocks and no totals
+## count, so achievements are only earned in real play.
+var paused := false
+
 var _unlocked := {} ## id -> unix time
 var _stats := {} ## stat name -> running total
 var _queue: Array = []
@@ -67,19 +75,22 @@ var _chime: AudioStreamPlayer
 func _ready() -> void:
 	layer = 110 # over everything, fades included
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_load()
+	if RESET_ON_LAUNCH:
+		reset_all()
+	else:
+		_load()
 	_build_toast()
 	_chime = AudioStreamPlayer.new()
-	_chime.stream = _make_chime()
+	_chime.stream = load(CHIME_PATH)
 	_chime.bus = &"SFX"
-	_chime.volume_db = -6.0
+	_chime.volume_db = -2.0
 	add_child(_chime)
 
 
 # --- Public ---------------------------------------------------------------------
 
 func unlock(id: String) -> void:
-	if _unlocked.has(id) or find(id).is_empty():
+	if paused or _unlocked.has(id) or find(id).is_empty():
 		return
 	_unlocked[id] = int(Time.get_unix_time_from_system())
 	_save()
@@ -96,6 +107,8 @@ func is_unlocked(id: String) -> bool:
 ## Add to a running total (e.g. "runs", "correct_total") and unlock whatever
 ## reaches its goal.
 func add_stat(stat_id: String, amount: int = 1) -> void:
+	if paused:
+		return
 	_stats[stat_id] = int(_stats.get(stat_id, 0)) + amount
 	_save()
 	for a in LIST:
@@ -217,32 +230,6 @@ func _build_toast() -> void:
 	col.add_child(_toast_desc)
 	_toast.visible = false
 	add_child(_toast)
-
-
-## A short bright two-note "ding" made in code (no sound file needed).
-func _make_chime() -> AudioStreamWAV:
-	var rate := 22050
-	var notes := [[1318.5, 0.0, 0.5], [1975.5, 0.11, 0.7]] # E6 then B6
-	var length := int(rate * 0.9)
-	var data := PackedByteArray()
-	data.resize(length * 2)
-	for i in length:
-		var t := float(i) / rate
-		var v := 0.0
-		for n in notes:
-			var start: float = n[1]
-			if t >= start:
-				var tt := t - start
-				var env := exp(-tt * 5.5) * minf(tt / 0.004, 1.0)
-				v += sin(TAU * n[0] * tt) * env * n[2] + sin(TAU * n[0] * 2.0 * tt) * env * n[2] * 0.15
-		var sample := int(clampf(v * 0.45, -1.0, 1.0) * 32767.0)
-		data.encode_s16(i * 2, sample)
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = rate
-	wav.stereo = false
-	wav.data = data
-	return wav
 
 
 # --- Save -------------------------------------------------------------------------

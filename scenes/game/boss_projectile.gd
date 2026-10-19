@@ -85,6 +85,8 @@ func _physics_process(delta: float) -> void:
 ## On the ground (or bounced off a wall): lie flat, then shrink away.
 func _land() -> void:
 	_flying = false
+	# Hanger: a light plastic clatter. Walis: lower and duller.
+	Sfx.play_at("clatter", global_position, 0.0, 1.0 if kind == 0 else 0.7, 0.08)
 	global_position.y = 0.06
 	_model.rotation = Vector3(0.0, randf() * TAU, 0.0)
 	if kind == 0:

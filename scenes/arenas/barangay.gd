@@ -177,6 +177,19 @@ func house_boxes() -> Array:
 	return out
 
 
+## Where a lamp would hang on each electric post (just under the top).
+func lamp_spots() -> Array:
+	var out := []
+	var body := get_node_or_null("Colliders")
+	if body == null:
+		return out
+	for cs in body.get_children():
+		if cs is CollisionShape3D and String(cs.name).begins_with("Post"):
+			var h: float = (cs.shape as BoxShape3D).size.y
+			out.append(cs.global_position + Vector3(0.0, h * 0.5 - 0.6, 0.0))
+	return out
+
+
 ## Mama's round: the invisible court walls come down so you can run between
 ## the houses, and the ground collider grows to cover the whole barangay.
 func set_open_world(on: bool) -> void:

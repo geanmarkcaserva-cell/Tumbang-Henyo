@@ -62,6 +62,7 @@ var _pause_skip: Button
 var _over_panel: Control
 var _over_text: Label
 var _over_again: Button
+var _over_title: Label
 var _fade: ColorRect
 var _fade_tween: Tween
 var _settings_panel: Control
@@ -255,9 +256,12 @@ func set_stamina(value: float, max_value: float) -> void:
 			UiFx.shake(_energy_icon, 8.0)
 
 
-func set_round(number: int) -> void:
-	var changed := _round_label.text != "Round %d" % number
-	_round_label.text = "Round %d" % number
+func set_round(number: int, final: bool = false) -> void:
+	var text := "Final round" if final else "Round %d" % number
+	var changed := _round_label.text != text
+	_round_label.text = text
+	if final:
+		_round_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.45))
 	if changed and number > 1:
 		UiFx.bounce(_round_pill, 1.25, 0.7)
 
@@ -311,7 +315,7 @@ func _show_clock(minutes: float) -> void:
 	var col := Color.WHITE
 	if minutes >= 18 * 60:
 		col = Color(1.0, 0.45, 0.4)
-	elif minutes >= 17 * 60:
+	elif minutes >= 17 * 60 + 40:
 		col = Color(1.0, 0.75, 0.4)
 	_clock_label.add_theme_color_override("font_color", col)
 	_clock_face.accent = col
@@ -332,6 +336,7 @@ static func clock_text(minutes: float) -> String:
 ## Big centre-screen title, e.g. "6:00 PM" / "Mama's home!".
 func show_banner(title: String, subtitle: String, color: Color = UiKit.ACCENT, seconds: float = 2.6) -> void:
 	_banner_title.text = title
+	Sfx.play("banner")
 	_banner_title.add_theme_color_override("font_color", color)
 	_banner_sub.text = subtitle
 	_banner.visible = true
@@ -523,7 +528,9 @@ func show_pause(on: bool) -> void:
 		UiFx.pop_in(_pause_panel)
 
 
-func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: int) -> void:
+func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: int, won: bool = false) -> void:
+	_over_title.text = "Nakauwi ka na!" if won else "Game over"
+	_over_title.add_theme_color_override("font_color", Color(0.62, 0.92, 1.0) if won else Color.WHITE)
 	var lines := [
 		"Score:  %s" % _thousands(score),
 		"Rounds cleared:  %d" % rounds,
@@ -600,14 +607,8 @@ func _build_stats() -> void:
 	card.position = Vector2(28, 24)
 	card.size = Vector2(566, 190)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var s := StyleBoxFlat.new()
-	s.bg_color = Color(0.03, 0.04, 0.07, 0.5)
-	s.border_color = Color(1, 1, 1, 0.08)
-	s.set_border_width_all(1)
-	s.set_corner_radius_all(26)
-	s.shadow_color = Color(0, 0, 0, 0.2)
-	s.shadow_size = 14
-	card.add_theme_stylebox_override("panel", s)
+	# No dark card behind the bars: icons, captions and bars sit right on the game.
+	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(card)
 
 	_awra_icon = _icon(ICON_AWRA, Vector2(12, 8), Vector2(100, 100))
@@ -738,12 +739,10 @@ func _build_wind() -> void:
 
 ## Clock pill right of the Round pill: a little clock face and the time.
 func _build_clock() -> void:
+	# Under the Awra and Energy bars, top left.
 	_clock_pill = _pill(Vector2(260, 74))
-	_clock_pill.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_clock_pill.offset_left = 166
-	_clock_pill.offset_right = 436
-	_clock_pill.offset_top = 24
-	_clock_pill.offset_bottom = 98
+	_clock_pill.position = Vector2(40, 200)
+	_clock_pill.size = Vector2(270, 74)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -945,7 +944,7 @@ func _build_coach() -> void:
 	coach = CoachCard.new()
 	coach.name = "Coach"
 	coach.process_mode = Node.PROCESS_MODE_PAUSABLE
-	coach.position = Vector2(28, 246) # under the stats card, clear of the aim
+	coach.position = Vector2(28, 300) # under the stats and the clock, clear of the aim
 	# Sized by hand (it moves between the side and the centre): fixed top-left pivot.
 	coach.set_meta("fx_skip", true)
 	coach.set_meta("fx_base", Vector2.ONE * UiFx.UI_SCALE)
@@ -1062,6 +1061,7 @@ func _close_settings() -> void:
 func _build_game_over_panel() -> Control:
 	var root := _dim_backdrop()
 	var v := _center_panel(root, "Game over")
+	_over_title = v.get_child(0)
 	_over_text = UiKit.label("", 42, Color.WHITE, 8)
 	_over_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_over_text)

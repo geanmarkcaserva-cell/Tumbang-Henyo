@@ -12,9 +12,9 @@ signal stamina_changed(value: float, max_value: float)
 @export var acceleration := 30.0
 @export var mouse_sensitivity := 0.003
 @export var touch_sensitivity := 0.0055 ## radians per design pixel of finger drag
-@export var max_stamina := 50.0 ## halved from 100: Energy is the player's only edge, so spend it carefully
-@export var stamina_drain := 18.0 ## per second while sprinting (about 2.8 s of full sprint)
-@export var stamina_regen := 15.0 ## per second while not sprinting
+@export var max_stamina := 25.0 ## halved twice (100 -> 50 -> 25): about 1.4 s of full sprint, so spend it carefully
+@export var stamina_drain := 18.0 ## per second while sprinting
+@export var stamina_regen := 8.0 ## per second while not sprinting (about 3 s to refill)
 @export var recover_at := 0.3 ## after running dry, sprint unlocks again at this fraction
 @export var min_pitch_deg := -45.0
 @export var max_pitch_deg := 15.0
@@ -34,14 +34,17 @@ signal stamina_changed(value: float, max_value: float)
 var controls_enabled := true ## movement and sprint
 var look_enabled := true ## mouse look
 var sprint_enabled := true ## off while throwing
-var stamina := 50.0
+var stamina := 25.0
 var _bounds := Rect2() ## x/z area the player must stay inside (empty = no limit)
+var _bounds_look_back := false ## Q still works inside _bounds (Mama's round)
 var _stagger_time := 0.0
 var _camera_tween: Tween
 var _exhausted := false
 var _coyote := 0.0
 var _jump_buffer := 0.0
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+const STRIDE := 1.7 ## metres per footstep sound at walking pace
+var _stride := 0.0
 
 @onready var _pivot: Node3D = $CameraPivot
 @onready var _spring: SpringArm3D = $CameraPivot/SpringArm3D
@@ -104,8 +107,11 @@ func set_aim_mode(on: bool) -> void:
 
 ## Keep the player inside an area on the ground. rect.position is (min x, min z),
 ## rect.size is (width along x, depth along z). Pass Rect2() to remove the limit.
-func set_move_bounds(rect: Rect2) -> void:
+## look_back: allow Q (look behind) inside these bounds. Off for the throw
+## zone, where the camera must keep facing the lata.
+func set_move_bounds(rect: Rect2, look_back := false) -> void:
 	_bounds = rect
+	_bounds_look_back = look_back
 
 
 ## The direction the camera looks (used to aim the throw).
@@ -165,6 +171,7 @@ func _physics_process(delta: float) -> void:
 	if _jump_buffer > 0.0 and _coyote > 0.0:
 		_jump(dir)
 		jumped = true
+		Sfx.play("jump", 0.0, 1.0, 0.06)
 	var airborne := jumped or not on_floor
 
 	# --- Sprint (energy) ---
@@ -174,6 +181,7 @@ func _physics_process(delta: float) -> void:
 		stamina = maxf(stamina - stamina_drain * delta, 0.0)
 		if stamina <= 0.0:
 			_exhausted = true
+			Sfx.play("exhausted") # out of breath
 	else:
 		stamina = minf(stamina + stamina_regen * delta, max_stamina)
 		if _exhausted and stamina >= max_stamina * recover_at:
@@ -188,14 +196,17 @@ func _physics_process(delta: float) -> void:
 		accel *= air_control
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, accel * delta)
+	var fall_speed := -velocity.y
 	move_and_slide()
 	_apply_bounds()
+	_footsteps(delta, on_floor, fall_speed, sprinting)
 
 	stamina_changed.emit(stamina, max_stamina)
 
 	# Hold look_back to swing the camera around and see who's chasing you.
 	# (Not while aiming a throw, or the aim would point backwards.)
-	var looking_back := controls_enabled and not _bounds.has_area() and Input.is_action_pressed("look_back")
+	var can_look := not _bounds.has_area() or _bounds_look_back
+	var looking_back := controls_enabled and can_look and Input.is_action_pressed("look_back")
 	_pivot.rotation.y = lerp_angle(_pivot.rotation.y, PI if looking_back else 0.0, 12.0 * delta)
 
 	# Field-of-view kick while sprinting.
@@ -221,6 +232,27 @@ func _jump(dir: Vector3) -> void:
 	velocity.x = flat.x
 	velocity.z = flat.y
 	stamina = maxf(stamina - jump_energy_cost, 0.0)
+
+
+## Steps on the concrete as you move (quicker and louder when sprinting),
+## and a thud when you land from a jump.
+func _footsteps(delta: float, was_on_floor: bool, fall_speed: float, sprinting: bool) -> void:
+	var on_floor := is_on_floor()
+	if on_floor and not was_on_floor and fall_speed > 2.5:
+		Sfx.play("land", linear_to_db(clampf(fall_speed / 7.0, 0.4, 1.0)), 1.0, 0.06)
+		_stride = 0.0
+		return
+	if not on_floor:
+		return
+	var moved := Vector2(velocity.x, velocity.z).length() * delta
+	if moved < 0.0005:
+		_stride = STRIDE * 0.6 # first step comes quickly after standing still
+		return
+	_stride += moved
+	var stride := STRIDE * (1.35 if sprinting else 1.0)
+	if _stride >= stride:
+		_stride = 0.0
+		Sfx.play("step", -2.0 if sprinting else -5.0, 1.0, 0.08)
 
 
 func _apply_bounds() -> void:

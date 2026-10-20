@@ -124,7 +124,7 @@ func _ready() -> void:
 
 
 ## PLAYTEST: owned without buying, on every account. Empty this before release.
-const PLAYTEST_OWNED := ["ashiela"]
+const PLAYTEST_OWNED := []
 
 
 func owns(item_id: String) -> bool:

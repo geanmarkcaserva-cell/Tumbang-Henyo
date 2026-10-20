@@ -12,7 +12,7 @@ signal unlocked(id: String)
 const SAVE_FILE := "achievements.cfg"
 ## Testing: wipe every achievement each time the game starts, so they can
 ## all be earned again. Set to false for release.
-const RESET_ON_LAUNCH := true
+const RESET_ON_LAUNCH := false
 const SHOW_TIME := 4.2 ## seconds each popup stays up
 const SLIDE_TIME := 0.35
 const CHIME_PATH := "res://art/Audio/sfx/achievement.wav"

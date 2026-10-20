@@ -14,6 +14,11 @@ const ENV_SCENE := preload("res://art/environment/barangay_env.glb")
 const PLANTS_SCENE := preload("res://art/environment/barangay_plants.glb")
 ## The textured house variants (art/source/house variantions.blend).
 const HOUSES_SCENE := preload("res://art/environment/house_variants.glb")
+## Hand-placed props around the court (stalls, umbrellas, tires, hollow blocks...),
+## exported by art/source/export_barangay.py. Loaded only if the file exists.
+const PROPS_PATH := "res://art/environment/barangay_props.glb"
+## Props lower than this get no collision, so you can run over tires and blocks.
+const PROP_MIN_COLLIDE_HEIGHT := 0.35
 const LAYOUT_PATH := "res://art/environment/barangay_layout.json"
 ## Middle of the court; distances for forced perspective are measured from here.
 const COURT_CENTRE := Vector2(0.0, -20.0)
@@ -30,6 +35,7 @@ const COURT_CENTRE := Vector2(0.0, -20.0)
 func _ready() -> void:
 	var env := ENV_SCENE.instantiate()
 	add_child(env)
+	_build_props()
 	var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT_PATH))
 	if layout == null:
 		push_error("Barangay: can't read %s" % LAYOUT_PATH)
@@ -40,6 +46,20 @@ func _ready() -> void:
 		_build_houses(layout.houses)
 	_build_plants(layout)
 	_build_colliders(layout.boxes)
+
+
+## The props model, with solid collision on everything tall enough to bump into.
+func _build_props() -> void:
+	if not ResourceLoader.exists(PROPS_PATH):
+		return
+	var props: Node3D = (load(PROPS_PATH) as PackedScene).instantiate()
+	props.name = "Props"
+	add_child(props)
+	for mi in props.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null or m.get_aabb().size.y * m.global_basis.get_scale().y < PROP_MIN_COLLIDE_HEIGHT:
+			continue
+		m.create_trimesh_collision()
 
 
 func _build_houses(entries: Array) -> void:

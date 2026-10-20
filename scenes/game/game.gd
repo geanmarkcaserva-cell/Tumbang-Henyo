@@ -75,6 +75,27 @@ const AWRA_MAMA_LATE := 30
 const AWRA_MAMA_HIT := 10
 const POINTS_MAMA := 1000
 
+## Secret rounds 16-25 (all five easter eggs found): after Mama, your friends
+## come back out to play until 7:00 PM, when the tanods start the curfew.
+const SECRET_LAST_ROUND := 25
+const CLOCK_CURFEW := 19.0 * 60.0
+const TANOD_SCRIPT := preload("res://scenes/game/tanod.gd")
+const TANOD_TIME := 40.0 ## seconds to get home before the tanods catch you
+const TANOD_SPOTS := [Vector3(-3.0, 0.0, -30.0), Vector3(3.0, 0.0, -30.0), Vector3(-6.5, 0.0, -34.0),
+		Vector3(6.5, 0.0, -34.0), Vector3(0.0, 0.0, -36.0)]
+const TANOD_KINDS := [0, 0, 1, 1, 0] ## Tanod.Kind: THROWER, THROWER, DASHER, DASHER, THROWER
+const AWRA_TANOD_CAUGHT := 30
+const AWRA_TANOD_LATE := 30
+const AWRA_TANOD_HIT := 8
+const TANOD_HIT_GRACE := 0.7 ## seconds after a hit when the next one doesn't count
+const POINTS_TANOD := 2500
+const CAPS_CURFEW := 150
+
+## PLAYTEST: start straight at this round (25 = the tanod curfew round, as if
+## all five easter eggs were found and you chose to keep playing). The
+## tutorial is skipped. Set back to 1 for normal games (and before release).
+const PLAYTEST_START_ROUND := 1
+
 ## Guard spots for extra tayas, as offsets from the lata.
 const TAYA_SPOTS := [Vector3(-1.6, 0, -1.2), Vector3(2.6, 0, 1.6), Vector3(-2.6, 0, 1.6), Vector3(0.0, 0, -2.8)]
 
@@ -111,6 +132,18 @@ var _goal: Dictionary = {} ## the house to reach (from Barangay.house_boxes())
 var _mama_left := 0.0
 var _mama_tick_shown := -1 ## last whole second that ticked
 var _sky_cycle: Node ## day_night.gd: the sky follows the clock
+var _run_seconds := 0.0 ## time played this run (for the account's stats)
+var _secret := false ## playing the secret rounds 16-25
+var _tanod_on := false ## the curfew round (25) is running
+var _tanods: Array = []
+var _tanod_hit_cd := 0.0
+var _item: Dictionary = {} ## the easter egg out this round ({} = none)
+var _item_pickup: Node3D
+var _item_beacon: Node3D
+var _item_spot := Vector3.ZERO
+var _nav: ChaseNav
+var _finish_gate: FinishGate ## the FINISH pad (hidden in Mama's and the tanods' rounds)
+var _npcs: Array = [] ## barangay folk strolling about (Npc)
 
 @onready var _player: CharacterBody3D = $Player
 @onready var _hud: CanvasLayer = $HUD
@@ -146,6 +179,7 @@ func _ready() -> void:
 
 	_hook_taya($Arena/Taya)
 	_ensure_tayas()
+	_build_finish_gate()
 
 	_bullseye = BULLSEYE_CAM.new()
 	_bullseye.name = "BullseyeCam"
@@ -156,7 +190,7 @@ func _ready() -> void:
 	_leaves.name = "WindLeaves"
 	_leaves.follow = _player
 	add_child(_leaves)
-	if not Economy.tutorial_done:
+	if not Economy.tutorial_done and PLAYTEST_START_ROUND <= 1:
 		_tut = Tutorial.new()
 		_tut.name = "Tutorial"
 		add_child(_tut)
@@ -185,16 +219,81 @@ func _ready() -> void:
 	_sky_cycle.tint_changed.connect(_on_sky_tint)
 	_sky_cycle.setup($Arena/WorldEnvironment, $Arena/Sun, barangay.lamp_spots() if barangay else [])
 	_update_clock(true)
+	_setup_world.call_deferred()
 	_begin()
+
+
+## Once the barangay's colliders are in: open the whole barangay up (the
+## fence round it is the limit), light the street lamps, stack the parkour
+## crates, then bake the paths the chasers use to get around houses.
+func _setup_world() -> void:
+	await get_tree().physics_frame
+	var barangay := _barangay()
+	if barangay:
+		barangay.set_open_world(true)
+		if barangay.lamppost_bulbs.is_empty():
+			await barangay.lampposts_built
+		_sky_cycle.add_lamps(barangay.lamppost_bulbs, barangay.bulb_material)
+		EasterEggs.build_steps(barangay)
+		barangay.build_cores()
+	await get_tree().physics_frame
+	_nav = ChaseNav.new()
+	_nav.name = "ChaseNav"
+	add_child(_nav)
+	_nav.build(_arena)
+	# The barangay folk: one of each, starting on the court (they start
+	# walking once the paths are baked).
+	var keep_clear := [_lata_home, _spawn.global_position]
+	for t in _tayas:
+		keep_clear.append((t as Node3D).global_position)
+	_npcs = Npc.spawn_all(_arena, barangay, keep_clear)
+
+
+## The FINISH pad (built in Blender) in place of the old flat strip.
+func _build_finish_gate() -> void:
+	var strip := _arena.get_node_or_null("Geometry/FinishStrip") as Node3D
+	if strip:
+		strip.visible = false
+	_finish_gate = FinishGate.new()
+	_finish_gate.name = "FinishGate"
+	_arena.add_child(_finish_gate)
+	_finish_gate.global_position = Vector3(_finish.global_position.x, 0.0, _finish.global_position.z)
+	_update_finish_gate()
+
+
+## No finish line in Mama's round (15) or the curfew round (25): you run home.
+func _update_finish_gate() -> void:
+	if _finish_gate:
+		_finish_gate.visible = not (round_number == MAMA_ROUND or (_secret and round_number == SECRET_LAST_ROUND))
 
 
 ## First run: the tutorial's welcome card, then the first question.
 func _begin() -> void:
+	if PLAYTEST_START_ROUND > 1 and not Lobby.in_match():
+		_jump_to_round(PLAYTEST_START_ROUND)
+		return
 	if _tut:
 		_set_player_mode(false, false) # stand still behind the welcome card
 		_hud.set_context("none")
 		await _tut.start()
 	_enter_quiz()
+
+
+## PLAYTEST: skip ahead to `n` (16-25 count as the secret rounds).
+func _jump_to_round(n: int) -> void:
+	round_number = n
+	_secret = n > MAMA_ROUND
+	_round_progress = 0.0
+	_hud.set_round(round_number, round_number == MAMA_ROUND or round_number == SECRET_LAST_ROUND)
+	_update_clock(true)
+	if round_number == SECRET_LAST_ROUND and _secret:
+		_begin_tanod_round()
+	elif round_number == MAMA_ROUND:
+		_begin_mama_round()
+	else:
+		_ensure_tayas()
+		_spawn_round_item()
+		_enter_quiz()
 
 
 func _tutorial_on() -> bool:
@@ -217,13 +316,29 @@ func _capture_mouse() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+## Never stuck in a house: if a landing slips through a wall or roof,
+## the barangay puts you back on the roof or outside (Barangay.unstick).
+var unstick_on := true
+
+
+func _physics_process(_delta: float) -> void:
+	if unstick_on and _player and state == State.RUN:
+		var b := _barangay()
+		if b:
+			b.unstick(_player)
+
+
 func _process(delta: float) -> void:
+	_update_finish_gate()
+	if state != State.GAME_OVER:
+		_run_seconds += delta
 	if Lobby.is_client():
 		_report_class()
 	if state == State.THROW:
 		_hud.update_wind(_wind, _player.global_basis)
-	elif state == State.RUN and _mama_on:
+	elif state == State.RUN and (_mama_on or _tanod_on):
 		_mama_tick(delta)
+	_tanod_hit_cd = maxf(_tanod_hit_cd - delta, 0.0)
 
 
 # --- Class game (multiplayer) ---------------------------------------------------------
@@ -254,6 +369,9 @@ func _on_class_left(reason: String) -> void:
 
 ## Time of day in minutes: each round is an equal slice between 8 AM and 6 PM.
 func _clock_minutes() -> float:
+	if round_number > MAMA_ROUND: # secret rounds: 6 PM -> 7 PM
+		var per := (CLOCK_CURFEW - CLOCK_MAMA) / float(SECRET_LAST_ROUND - MAMA_ROUND)
+		return minf(CLOCK_MAMA + per * (round_number - MAMA_ROUND + _round_progress), CLOCK_CURFEW)
 	var per_round := (CLOCK_MAMA - CLOCK_START) / float(MAMA_ROUND - 1)
 	return CLOCK_START + per_round * (round_number - 1 + _round_progress)
 
@@ -342,6 +460,8 @@ func _taya_lineup() -> Array:
 		return [false, false, true]
 	elif round_number <= 12:
 		return [false, false, false, true]
+	elif round_number > MAMA_ROUND: # the secret rounds: all your friends are back
+		return [false, false, true, true, true]
 	return [false, false, false, true, true]
 
 
@@ -601,6 +721,9 @@ func _enter_run() -> void:
 	if _mama_on:
 		_enter_mama_run()
 		return
+	if _tanod_on:
+		_enter_tanod_run()
+		return
 	_set_state(State.RUN)
 	_set_player_mode(true, true)
 	_hud.show_throw_ui(false)
@@ -615,6 +738,8 @@ func _enter_run() -> void:
 		Sfx.play("voice_takbo")
 		var who := "the taya" if _tayas.size() == 1 else "a taya"
 		_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
+		if not _item.is_empty() and is_instance_valid(_item_pickup) and EasterEggs.SHOW_MARKERS:
+			_hud.set_beacon(_item_spot, _player, Color(1.0, 0.82, 0.3))
 	var speed_ratio := TUTORIAL_TAYA_SPEED_RATIO if practice else TAYA_SPEED_RATIO
 	var reset_time := _lata_reset_time() * (TUTORIAL_RESET_MULT if practice else 1.0)
 	for t in _tayas:
@@ -664,7 +789,7 @@ func _on_tagged() -> void:
 	_set_state(State.TAGGED)
 	_round_hurt = true
 	Sfx.play("tagged")
-	Sfx.play("voice_taya_ka")
+	Sfx.play("voice_huli_ka")
 	_set_player_mode(false, false)
 	_hud.set_context("none")
 	_stop_tayas()
@@ -673,10 +798,10 @@ func _on_tagged() -> void:
 	if state == State.GAME_OVER:
 		return
 	if practice:
-		_hud.show_status("Taya ka!")
+		_hud.show_status("Huli ka!")
 		_tut.on_tagged()
 	else:
-		_hud.show_status("Taya ka! -%d Awra" % AWRA_TAGGED)
+		_hud.show_status("Huli ka! -%d Awra" % AWRA_TAGGED)
 	await _wait(2.4 if practice else 1.8)
 	if state == State.TAGGED:
 		if practice:
@@ -686,8 +811,8 @@ func _on_tagged() -> void:
 
 
 func _on_finish_body_entered(body: Node3D) -> void:
-	if _mama_on:
-		return # in Mama's round the finish is the beacon house
+	if _mama_on or _tanod_on:
+		return # in Mama's (and the tanods') round the finish is the beacon house
 	if state == State.RUN and body == _player:
 		_round_clear()
 
@@ -734,16 +859,21 @@ func _round_clear() -> void:
 	_round_hurt = false
 	_round_slipper_hit = false
 	_mama_hit_round = false
-	_hud.set_round(round_number, round_number == MAMA_ROUND)
+	_hud.set_round(round_number, round_number == MAMA_ROUND or round_number == SECRET_LAST_ROUND)
 	_update_clock()
 	_hud.show_status("")
 	if _mama_on:
 		_end_mama_round() # Mama's calmed down: the tayas come back out
+	_clear_round_item()
 	_reset_field()
 	if round_number == MAMA_ROUND:
 		_begin_mama_round()
 		return
+	if _secret and round_number == SECRET_LAST_ROUND:
+		_begin_tanod_round()
+		return
 	var joined := _ensure_tayas()
+	_spawn_round_item()
 	_enter_quiz()
 	if joined > 0:
 		var elite_joined: bool = _tayas.back().elite
@@ -761,7 +891,7 @@ func _round_achievements() -> void:
 	Achievements.unlock("takbo")
 	if _round_clean and not _round_hurt:
 		Achievements.unlock("flawless")
-	if not _mama_on:
+	if not _mama_on and not _tanod_on:
 		if _tayas.size() >= 3 and not _round_slipper_hit:
 			Achievements.unlock("untouchable")
 		for t in _tayas:
@@ -771,6 +901,8 @@ func _round_achievements() -> void:
 		Achievements.unlock("nakauwi")
 		if not _mama_hit_round:
 			Achievements.unlock("hanger_dodger")
+	if _tanod_on:
+		Achievements.unlock("curfew")
 	if awra <= 15 and not _tutorial_on():
 		Achievements.unlock("last_breath")
 
@@ -817,6 +949,14 @@ func _reset_field() -> void:
 		_beacon.visible = false
 		_hud.show_boss_timer(false)
 		_hud.set_beacon(null)
+	if _tanod_on:
+		for i in _tanods.size():
+			_tanods[i].wait_at(TANOD_SPOTS[i])
+		_beacon.visible = false
+		_hud.show_boss_timer(false)
+		_hud.set_beacon(null)
+	if not _mama_on and not _tanod_on:
+		_hud.set_beacon(null)
 
 
 func _add_caps(amount: int) -> void:
@@ -848,11 +988,14 @@ func _game_over(won: bool = false) -> void:
 	_stop_tayas()
 	if _mama:
 		_mama.stop()
+	for td in _tanods:
+		td.stop()
 	_hud.show_throw_ui(false)
 	_set_player_mode(false, false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var rounds_cleared := round_number if won else round_number - 1
 	var rank := GameManager.submit_score(theme_id, score, rounds_cleared)
+	Economy.record_run(theme_id, score, rounds_cleared, won, perfect_shots, _run_seconds)
 	_hud.show_game_over(score, rounds_cleared, _run_caps, rank, GameManager.best_score(theme_id), won)
 	if Lobby.is_client():
 		_report_class() # final score, marked out
@@ -924,9 +1067,6 @@ func _end_mama_round() -> void:
 	_beacon.visible = false
 	_hud.show_boss_timer(false)
 	_hud.set_beacon(null)
-	var barangay := _barangay()
-	if barangay:
-		barangay.set_open_world(false)
 	for t in _tayas:
 		t.come_back()
 	_ensure_tayas()
@@ -985,6 +1125,7 @@ func _enter_mama_run() -> void:
 	_mama.start_chase()
 
 
+## The countdown to get home (Mama's round and the curfew round).
 func _mama_tick(delta: float) -> void:
 	_mama_left -= delta
 	_hud.set_boss_time(_mama_left)
@@ -994,9 +1135,15 @@ func _mama_tick(delta: float) -> void:
 		_mama_tick_shown = whole
 		Sfx.play("tick_urgent" if whole <= 5 else "tick")
 	if _at_goal():
-		_mama_success()
+		if _tanod_on:
+			_tanod_success()
+		else:
+			_mama_success()
 	elif _mama_left <= 0.0:
-		_mama_failed(false)
+		if _tanod_on:
+			_tanod_failed(false)
+		else:
+			_mama_failed(false)
 
 
 func _at_goal() -> bool:
@@ -1037,8 +1184,22 @@ func _victory() -> void:
 	Sfx.play("victory")
 	_hud.show_banner("Nakauwi ka na!", "Mama's not angry anymore.  +%d points" % gained, Color(0.55, 0.92, 1.0), 2.6)
 	await _wait(3.4)
-	if state == State.ROUND_CLEAR:
-		_game_over(true)
+	if state != State.ROUND_CLEAR:
+		return
+	# All five hidden items found: the night isn't over yet.
+	if Economy.has_all_eggs() and not Lobby.in_match():
+		var icons := []
+		for it in EasterEggs.ITEMS:
+			icons.append(EasterEggs.icon(it.id, 6))
+		_hud.ask_choice("Labas ulit?", "Your friends are back outside and want to keep playing until 7:00 PM.\nRounds 16 to 25. Watch out for the tanods at curfew!",
+				["Keep playing", "Finish"], icons)
+		var pick: int = await _hud.choice_made
+		if state != State.ROUND_CLEAR:
+			return
+		if pick == 0:
+			_start_secret_rounds()
+			return
+	_game_over(true)
 
 
 func _on_mama_caught() -> void:
@@ -1085,6 +1246,249 @@ func _on_mama_hit() -> void:
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
 	_hud.show_status("Aray! -%d Awra" % AWRA_MAMA_HIT)
+
+
+# --- Secret rounds 16-25 and the curfew (7:00 PM) -------------------------------------
+#
+# Unlocked by finding all five easter eggs. After Mama's round you can keep
+# playing: your friends come back out (five tayas, three elites), the clock
+# runs on from 6 PM, and at 7:00 PM (round 25) the tanods start the curfew:
+# five of them chase you home. Throwers never stop throwing tsinelas; dashers
+# show a red strip on the ground and then charge along it.
+
+func _start_secret_rounds() -> void:
+	_secret = true
+	Achievements.unlock("night_out")
+	Music.play("game")
+	await _hud.fade_out(FADE_TIME)
+	if state != State.ROUND_CLEAR:
+		_hud.fade_in(FADE_TIME)
+		return
+	round_number += 1
+	_round_progress = 0.0
+	_round_clean = true
+	_round_hurt = false
+	_round_slipper_hit = false
+	_mama_hit_round = false
+	_hud.set_round(round_number)
+	_update_clock()
+	_end_mama_round()
+	_reset_field()
+	_ensure_tayas()
+	_enter_quiz()
+	await _wait(0.15)
+	_hud.fade_in(FADE_TIME)
+	_hud.show_banner("Labas ulit!", "Your friends are back to play. Until 7:00 PM!", UiKit.ACCENT, 2.6)
+
+
+## Round 25, 7:00 PM: the tanods come out.
+func _begin_tanod_round() -> void:
+	_tanod_on = true
+	_set_player_mode(false, false)
+	_hud.set_context("none")
+	var barangay := _barangay()
+	if barangay:
+		barangay.set_open_world(true)
+	if _tanods.is_empty():
+		for i in TANOD_SPOTS.size():
+			var td: CharacterBody3D = TANOD_SCRIPT.new()
+			td.kind = TANOD_KINDS[i]
+			td.name = "Tanod%d" % (i + 1)
+			_arena.add_child(td)
+			td.setup(_player)
+			td.caught_player.connect(_on_tanod_caught)
+			td.hit_player.connect(_on_tanod_hit.bind(td))
+			_tanods.append(td)
+	for i in _tanods.size():
+		_tanods[i].visible = true
+		_tanods[i].process_mode = Node.PROCESS_MODE_INHERIT
+		_tanods[i].wait_at(TANOD_SPOTS[i])
+	_goal = _pick_goal_house()
+	if _beacon == null:
+		_beacon = BEACON_SCRIPT.new()
+		_beacon.name = "Beacon"
+		_beacon.footprint_radius = maxf(_goal.half.x, _goal.half.y) + MAMA_GOAL_MARGIN * 0.6
+		_arena.add_child(_beacon)
+	_beacon.global_position = _goal.centre
+	_beacon.visible = false
+	await _wait(0.15)
+	_hud.fade_in(FADE_TIME)
+	_hud.show_banner("7:00 PM", "Curfew! The tanods are out!", Color(1.0, 0.55, 0.25), 2.4)
+	Sfx.play("whistle")
+	Sfx.play("mama_sting", -4.0, 0.8)
+	await _wait(0.7)
+	_send_tayas_home()
+	await _wait(2.4)
+	if not _tanod_on or state == State.GAME_OVER:
+		return
+	if Economy.first_time("tanod"):
+		_hud.show_tip("Curfew!", "Knock the lata down, then run home to the light in %d seconds. Orange tanods dash along the red strip: get out of it!" % int(TANOD_TIME), 9.0)
+	_enter_quiz()
+
+
+func _enter_tanod_run() -> void:
+	_set_state(State.RUN)
+	_set_player_mode(true, true)
+	_player.set_move_bounds(MAMA_AREA, true)
+	_hud.show_throw_ui(false)
+	_hud.set_context("run")
+	_leaves.set_active(false)
+	_capture_mouse()
+	_beacon.visible = true
+	_hud.set_beacon(_goal.centre, _player)
+	_mama_left = TANOD_TIME
+	_hud.show_boss_timer(true, "Get home!")
+	_hud.set_boss_time(_mama_left)
+	_hud.show_status("Takbo! The tanods are coming!")
+	_mama_tick_shown = -1
+	Music.play("mama")
+	Sfx.play("whistle")
+	for i in _tanods.size():
+		_tanods[i].start_chase(i * 0.25)
+
+
+func _on_tanod_caught() -> void:
+	if state == State.RUN and _tanod_on:
+		_tanod_failed(true)
+
+
+func _on_tanod_hit(from: CharacterBody3D) -> void:
+	if state != State.RUN or not _tanod_on or _tanod_hit_cd > 0.0:
+		return
+	_tanod_hit_cd = TANOD_HIT_GRACE
+	_round_hurt = true
+	Sfx.play("slap", 0.0, 1.0, 0.06)
+	Sfx.play("voice_aray")
+	_lose_awra(AWRA_TANOD_HIT)
+	if state == State.GAME_OVER:
+		return
+	var away := _player.global_position - from.global_position
+	away.y = 0.0
+	_player.stagger(SLIPPER_STAGGER_TIME * 0.7, away.normalized() * SLIPPER_KNOCKBACK)
+	_hud.show_status("Aray! -%d Awra" % AWRA_TANOD_HIT)
+
+
+func _stop_tanods() -> void:
+	for td in _tanods:
+		td.stop()
+		td.clear_thrown()
+
+
+func _tanod_failed(caught: bool) -> void:
+	_set_state(State.TAGGED)
+	_round_hurt = true
+	_set_player_mode(false, false)
+	_hud.set_context("none")
+	_hud.show_boss_timer(false)
+	_hud.set_beacon(null)
+	_stop_tanods()
+	_player.hurt()
+	_lose_awra(AWRA_TANOD_CAUGHT if caught else AWRA_TANOD_LATE)
+	if state == State.GAME_OVER:
+		return
+	Sfx.play("tagged" if caught else "timeout")
+	if caught:
+		_hud.show_banner("HULI KA!", "The tanods caught you.  -%d Awra" % AWRA_TANOD_CAUGHT, Color(1.0, 0.55, 0.25), 1.4)
+	else:
+		_hud.show_banner("Too late!", "Past curfew.  -%d Awra" % AWRA_TANOD_LATE, Color(1.0, 0.55, 0.25), 1.4)
+	_hud.show_status("")
+	await _wait(2.2)
+	if state == State.TAGGED:
+		_next_attempt()
+
+
+## Home before the tanods caught you: the end of the secret rounds.
+func _tanod_success() -> void:
+	_stop_tanods()
+	_hud.show_boss_timer(false)
+	_hud.set_beacon(null)
+	_round_points += POINTS_TANOD
+	_set_state(State.ROUND_CLEAR)
+	_set_player_mode(false, false)
+	_hud.set_context("none")
+	_player.celebrate(-1.0)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_round_achievements()
+	var gained := int(round((_round_points + POINTS_ROUND_CLEAR) * (1.0 + 0.1 * (round_number - 1))))
+	score += gained
+	_round_points = 0
+	_hud.set_score(score)
+	_add_caps(CAPS_CURFEW)
+	if not Economy.beat_tanods:
+		Economy.beat_tanods = true # Ashiela can now be bought
+		Economy.save_profile()
+	if score >= 10000:
+		Achievements.unlock("big_score")
+	if score >= 15000:
+		Achievements.unlock("legend")
+	Sfx.play("victory")
+	_hud.show_banner("Ligtas ka!", "Home before curfew.  +%d points" % gained, Color(1.0, 0.82, 0.3), 2.8)
+	await _wait(3.6)
+	if state == State.ROUND_CLEAR:
+		_game_over(true)
+
+
+# --- Easter eggs (rounds 3, 6, 8, 9, 12) ------------------------------------------
+
+## Put this round's hidden item out (if it has one and you haven't found it).
+## It just sits there: nothing points at it (unless EasterEggs.SHOW_MARKERS
+## is turned on for playtesting).
+func _spawn_round_item() -> void:
+	_clear_round_item()
+	if _tutorial_on() or Lobby.in_match() or _secret:
+		return
+	var it := EasterEggs.for_round(round_number)
+	var barangay := _barangay()
+	if it.is_empty() or Economy.has_collected(it.id) or barangay == null:
+		return
+	var spot := EasterEggs.world_spot(barangay, it)
+	if spot == Vector3.INF:
+		return
+	_item = it
+	_item_spot = spot
+	var pickup := EasterEggs.Pickup.new()
+	pickup.item = it
+	pickup.name = "Item_" + String(it.id)
+	_arena.add_child(pickup)
+	pickup.global_position = spot
+	pickup.collected.connect(_on_item_collected)
+	_item_pickup = pickup
+	if EasterEggs.SHOW_MARKERS:
+		_item_beacon = BEACON_SCRIPT.new()
+		_item_beacon.color = Color(1.0, 0.82, 0.3)
+		_item_beacon.footprint_radius = 1.2
+		_item_beacon.name = "ItemBeacon"
+		_arena.add_child(_item_beacon)
+		_item_beacon.global_position = spot
+	print("Easter egg out: %s at %s" % [it.id, spot])
+
+
+func _clear_round_item() -> void:
+	if is_instance_valid(_item_pickup):
+		_item_pickup.queue_free()
+	if is_instance_valid(_item_beacon):
+		_item_beacon.queue_free()
+	_item_pickup = null
+	_item_beacon = null
+	_item = {}
+
+
+func _on_item_collected(item_id: String) -> void:
+	var it := EasterEggs.find(item_id)
+	var is_new := Economy.collect(item_id)
+	Achievements.unlock(it.get("achievement", ""))
+	Sfx.play("achievement")
+	Sfx.play("coin", 0.0, 1.3)
+	if is_instance_valid(_item_beacon):
+		_item_beacon.queue_free()
+	if state == State.RUN:
+		_hud.set_beacon(null)
+	var found := Economy.collection.size()
+	if Economy.has_all_eggs():
+		Achievements.unlock("all_eggs")
+		_hud.show_banner("Kumpleto!", "All 5 found! Stay out past 6:00 PM to see what happens...", Color(1.0, 0.82, 0.3), 3.2)
+	elif is_new:
+		_hud.show_banner(it.name + "!", "Hidden item found  (%d / %d)  -  see Collection" % [found, EasterEggs.ITEMS.size()], Color(1.0, 0.82, 0.3), 2.6)
 
 
 # --- Pause ----------------------------------------------------------------------

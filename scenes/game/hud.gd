@@ -17,6 +17,7 @@ signal resume_pressed
 signal play_again_pressed
 signal main_menu_pressed
 signal skip_tutorial_pressed
+signal choice_made(index: int) ## a button on ask_choice()'s card was pressed
 
 const ICON_AWRA := preload("res://art/ui/hud/icon_awra.webp")
 const ICON_SPRINT := preload("res://art/ui/hud/icon_sprint.webp")
@@ -66,6 +67,11 @@ var _over_title: Label
 var _fade: ColorRect
 var _fade_tween: Tween
 var _settings_panel: Control
+var _choice_panel: Control
+var _choice_title: Label
+var _choice_body: Label
+var _choice_icons: HBoxContainer
+var _choice_buttons: HBoxContainer
 
 var _clock_pill: PanelContainer
 var _clock_face: ClockFace
@@ -141,6 +147,7 @@ func _ready() -> void:
 	_fade.z_index = 40 # over the game and quiz, under pause / game over (50)
 	add_child(_fade)
 	_settings_panel = _build_settings_panel()
+	_choice_panel = _build_choice_panel()
 	UiFx.shrink(self) # a bit smaller than drawn, each piece toward its own edge
 
 	Settings.changed.connect(_apply_touch_setting)
@@ -178,11 +185,12 @@ func _update_hints() -> void:
 		_hints.visible = false
 		return
 	var groups := []
-	match _context:
+	var move := [Settings.key_name("move_forward"), Settings.key_name("move_left"), Settings.key_name("move_back"), Settings.key_name("move_right")]
+	match _context: # the player's own keys (Settings > Controls)
 		"throw":
-			groups = [[["W", "A", "S", "D"], "Move"], [["Mouse"], "Aim"], [["Hold LMB"], "Charge, release to throw"]]
+			groups = [[move, "Move"], [["Mouse"], "Aim"], [["Hold " + Settings.key_name("throw")], "Charge, release to throw"]]
 		"run":
-			groups = [[["W", "A", "S", "D"], "Run"], [["Shift"], "Sprint"], [["Space"], "Jump"], [["Q"], "Look back"]]
+			groups = [[move, "Run"], [[Settings.key_name("sprint")], "Sprint"], [[Settings.key_name("jump")], "Jump"], [[Settings.key_name("look_back")], "Look back"]]
 	_hints.visible = not groups.is_empty()
 	for g in groups:
 		var chip := _pill(Vector2(0, 58))
@@ -262,6 +270,8 @@ func set_round(number: int, final: bool = false) -> void:
 	_round_label.text = text
 	if final:
 		_round_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.45))
+	else:
+		_round_label.add_theme_color_override("font_color", Color.WHITE)
 	if changed and number > 1:
 		UiFx.bounce(_round_pill, 1.25, 0.7)
 
@@ -473,11 +483,12 @@ func set_boss_time(seconds_left: float) -> void:
 
 ## Point at the beacon: a chip over it when on screen, an arrow at the edge
 ## of the screen when it isn't. at = null hides it.
-func set_beacon(at: Variant, from: Node3D = null) -> void:
+func set_beacon(at: Variant, from: Node3D = null, color: Color = Color(0.55, 0.92, 1.0)) -> void:
 	_beacon_marker.visible = at != null
 	if at != null:
 		_beacon_marker.world_pos = at
 		_beacon_marker.from = from
+		_beacon_marker.COL = color
 
 
 func show_throw_ui(on: bool) -> void:
@@ -1058,6 +1069,59 @@ func _close_settings() -> void:
 	UiFx.pop_in(_pause_panel)
 
 
+## A card in the middle of the screen with a question and a row of buttons.
+## Wait for the answer with `await choice_made` (the index of the button).
+## icons: textures shown in a row above the text (may be empty).
+func ask_choice(title: String, body: String, options: Array, icons: Array = []) -> void:
+	_choice_title.text = title
+	_choice_body.text = body
+	for c in _choice_icons.get_children():
+		c.queue_free()
+	for tex in icons:
+		var t := TextureRect.new()
+		t.texture = tex
+		t.custom_minimum_size = Vector2(96, 96)
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		_choice_icons.add_child(t)
+	_choice_icons.visible = not icons.is_empty()
+	for c in _choice_buttons.get_children():
+		c.queue_free()
+	for i in options.size():
+		var b := UiKit.button(options[i], UiKit.GOLD if i == 0 else UiKit.BLUE, 46, Vector2(420, 116))
+		var index := i
+		b.pressed.connect(func():
+			_choice_panel.visible = false
+			choice_made.emit(index))
+		_choice_buttons.add_child(b)
+	_status.text = ""
+	set_context("none")
+	_choice_panel.visible = true
+	UiFx.pop_in(_choice_panel)
+
+
+func _build_choice_panel() -> Control:
+	var root := _dim_backdrop()
+	var v := _center_panel(root, "")
+	_choice_title = v.get_child(0)
+	_choice_icons = HBoxContainer.new()
+	_choice_icons.alignment = BoxContainer.ALIGNMENT_CENTER
+	_choice_icons.add_theme_constant_override("separation", 22)
+	v.add_child(_choice_icons)
+	v.move_child(_choice_icons, 0)
+	_choice_body = UiKit.label("", 38, Color(1, 1, 1, 0.9), 6)
+	_choice_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_choice_body.custom_minimum_size = Vector2(1000, 0)
+	v.add_child(_choice_body)
+	_choice_buttons = HBoxContainer.new()
+	_choice_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	_choice_buttons.add_theme_constant_override("separation", 28)
+	v.add_child(_choice_buttons)
+	return root
+
+
 func _build_game_over_panel() -> Control:
 	var root := _dim_backdrop()
 	var v := _center_panel(root, "Game over")
@@ -1140,7 +1204,7 @@ class ClockFace extends Control:
 ## Where the beacon house is: a bobbing arrow and distance over it when it's on
 ## screen, an arrow on the edge of the screen pointing the way when it isn't.
 class BeaconMarker extends Control:
-	const COL := Color(0.55, 0.92, 1.0)
+	var COL := Color(0.55, 0.92, 1.0)
 	const MARGIN := 90.0
 	var world_pos := Vector3.ZERO
 	var from: Node3D

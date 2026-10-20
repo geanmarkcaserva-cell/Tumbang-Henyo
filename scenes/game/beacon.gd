@@ -5,7 +5,7 @@ extends Node3D
 ## the ground around the house so you know where "there" is.
 
 const HEIGHT := 160.0
-const COLOR := Color(0.55, 0.92, 1.0)
+var color := Color(0.55, 0.92, 1.0) ## set before adding (Mama: blue; items: gold)
 
 const BEAM_SHADER := """
 shader_type spatial;
@@ -43,7 +43,7 @@ func _ready() -> void:
 	var shader := Shader.new()
 	shader.code = BEAM_SHADER
 	_add_beam(shader, 0.7, Color(0.92, 1.0, 1.0), 1.3, 1.2) # white-hot core
-	_add_beam(shader, 2.4, COLOR, 0.9, 2.2) # coloured glow around it
+	_add_beam(shader, 2.4, color, 0.9, 2.2) # coloured glow around it
 
 	# Ground ring around the house.
 	_ring = MeshInstance3D.new()
@@ -55,7 +55,7 @@ func _ready() -> void:
 	_ring.mesh = torus
 	var rm := StandardMaterial3D.new()
 	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	rm.albedo_color = Color(COLOR.r, COLOR.g, COLOR.b, 0.85)
+	rm.albedo_color = Color(color.r, color.g, color.b, 0.85)
 	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_ring.material_override = rm
 	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -64,14 +64,14 @@ func _ready() -> void:
 	add_child(_ring)
 
 	_light = OmniLight3D.new()
-	_light.light_color = COLOR
+	_light.light_color = color
 	_light.light_energy = 2.5
 	_light.omni_range = footprint_radius + 6.0
 	_light.position.y = 2.5
 	add_child(_light)
 
 
-func _add_beam(shader: Shader, radius: float, color: Color, strength: float, soft: float) -> void:
+func _add_beam(shader: Shader, radius: float, col: Color, strength: float, soft: float) -> void:
 	var mi := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = radius
@@ -84,7 +84,7 @@ func _add_beam(shader: Shader, radius: float, color: Color, strength: float, sof
 	mi.mesh = cyl
 	var mat := ShaderMaterial.new()
 	mat.shader = shader
-	mat.set_shader_parameter("beam_color", color)
+	mat.set_shader_parameter("beam_color", col)
 	mat.set_shader_parameter("strength", strength)
 	mat.set_shader_parameter("height", HEIGHT)
 	mat.set_shader_parameter("soft", soft)

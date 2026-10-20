@@ -4,8 +4,10 @@ extends CharacterBody3D
 ##
 ## She's much faster than the player but runs like a freight train: wide
 ## turns, and she slows down for sharp ones. When a house blocks her view she
-## follows the player's own footsteps around it, so breaking line of sight
-## and cutting tight corners round the houses is how you shake her.
+## takes the way around it (ChaseNav; before that's ready, she follows the
+## player's own footsteps), so breaking line of sight and cutting tight
+## corners round the houses is how you shake her. Up on a roof she can't
+## reach you, but she'll wait below (and keep throwing).
 ## She throws hangers and walis tambo (brooms) without ever running out.
 
 signal caught_player
@@ -137,6 +139,7 @@ var _doll: PaperDoll
 var _shout: Label3D
 var _shout_t := 0.0
 var _thrown: Array[Node3D] = []
+var _memo := {} ## ChaseNav's path cache
 
 
 func _ready() -> void:
@@ -155,7 +158,7 @@ func _ready() -> void:
 	_doll.shadow_radius = 0.6
 	_doll.hop_height = 0.22
 	add_child(_doll)
-	_doll.set_look(_build_look())
+	_doll.set_look(_load_look())
 
 	_shout = Label3D.new()
 	_shout.text = "MAMA!"
@@ -171,6 +174,20 @@ func _ready() -> void:
 	_shout.outline_render_priority = 19
 	_shout.position = Vector3(0.0, 3.25, 0.0)
 	add_child(_shout)
+
+
+## Her sheets live in art/characters/Mom (mom_idle.png: front, belt up;
+## mom_run.png: back). Edit those to change how she looks; without them she
+## is drawn from the pixel rows below.
+const SPRITE_DIR := "res://art/characters/Mom"
+
+
+func _load_look() -> Dictionary:
+	if ResourceLoader.exists(SPRITE_DIR + "/mom_idle.png"):
+		return PixelArt.character_look({"id": "mom", "palette": {}, "sprite": {"dir": SPRITE_DIR,
+			"happy": "mom_idle.png", "pixel_size": 0.088, "idle_fps": 7.0, "happy_fps": 7.0,
+			"idle_frames": 2, "happy_frames": 2, "cap_height": false}})
+	return _build_look()
 
 
 func _build_look() -> Dictionary:
@@ -302,7 +319,10 @@ func _physics_process(delta: float) -> void:
 					break
 
 	var dest := goal
-	if not _sees and _trail_idx < _trail.size():
+	var nav := ChaseNav.current
+	if nav and nav.is_ready:
+		dest = nav.route(self, goal, _memo, delta)
+	elif not _sees and _trail_idx < _trail.size():
 		dest = _trail[_trail_idx]
 		if _flat(dest - me).length() < 1.3:
 			_trail_idx = mini(_trail_idx + 1, _trail.size() - 1)

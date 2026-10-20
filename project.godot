@@ -12,12 +12,11 @@ config_version=5
 
 config/name="Tumbang Henyo"
 run/main_scene="res://scenes/menus/boot_loading.tscn"
-config/features=PackedStringArray("4.7", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://art/ui/app_icon.png"
 
 [autoload]
 
-MCPRuntime="*uid://t5glcrwvkt67"
 QuizDatabase="*res://autoload/quiz_database.gd"
 GameManager="*res://autoload/game_manager.gd"
 Economy="*res://autoload/economy.gd"
@@ -27,6 +26,8 @@ Music="*res://autoload/music.gd"
 Settings="*res://autoload/settings.gd"
 Lobby="*res://autoload/lobby.gd"
 Achievements="*res://autoload/achievements.gd"
+MCPRuntime="*res://addons/godot_mcp/runtime/mcp_runtime.gd"
+Accounts="*res://autoload/accounts.gd"
 
 [display]
 

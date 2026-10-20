@@ -9,7 +9,9 @@ extends CharacterBody3D
 ## - it has momentum: limited turn speed, and sharp turns cost speed;
 ## - up close it commits to a lunge in a straight line - sidestep and it misses,
 ##   then stumbles briefly;
-## - its throws scatter by `aim_error` metres.
+## - its throws scatter by `aim_error` metres;
+## - it runs around houses instead of into them (ChaseNav), and if you're up
+##   on a roof it waits below and throws up at you.
 ##
 ## States: GUARD -> RESET -> CHASE <-> WIND_UP / PICKUP / LUNGE -> RECOVER.
 
@@ -89,11 +91,46 @@ var _speed := 0.0
 var _seen_pos := Vector3.ZERO ## where it last saw the player
 var _seen_vel := Vector3.ZERO ## which way the player was moving then
 var _look_timer := 0.0
+var _seen_y := 0.0 ## how high the player was (on a roof?)
+var _memo := {} ## ChaseNav's path cache for this taya
 
 var _alert: Label3D ## the "!" over its head while it winds up a throw
 var _alert_time := 0.0
 
 @onready var _ring: MeshInstance3D = $WarningRing
+
+
+## GM and Ashiela are a couple. If you play one of them and this taya is
+## the other, they chase you but never throw a slipper or tag you: they
+## catch up to a step away and stay there, with a "<3" over their head.
+const COUPLE := {"gm": "ashiela", "ashiela": "gm"}
+const SWEET_RANGE := 4.0 ## the "<3" shows this close
+const SWEET_GAP := 1.6 ## never closer than this: they can't quite catch you
+
+var smitten := false
+var _heart: Label3D
+var _heart_t := 0.0
+
+
+## Every taya is one of the barkada: a random hand-drawn playable character
+## (never an NPC), all different from the other tayas out while there are
+## enough to go round, and never the one you're playing as. {} when there
+## are none (then the old red-shirt placeholder).
+var skin_id := ""
+
+
+static func _pick_skin() -> Dictionary:
+	var all: Array = Economy.sprite_characters()
+	var pool: Array = all.filter(func(c: Dictionary) -> bool: return c.id != Economy.equipped_character)
+	if pool.is_empty():
+		pool = all
+	var used := {}
+	for t in (Engine.get_main_loop() as SceneTree).get_nodes_in_group("taya"):
+		used[t.get("skin_id")] = true
+	var free: Array = pool.filter(func(c: Dictionary) -> bool: return not used.has(c.id))
+	if free.is_empty():
+		free = pool
+	return free.pick_random() if not free.is_empty() else {}
 
 
 func _ready() -> void:
@@ -102,8 +139,27 @@ func _ready() -> void:
 		max_slippers = 3
 	_guard_transform = global_transform
 	slippers = max_slippers
-	var palette: Dictionary = ELITE_PALETTE if elite else PALETTE
-	$PaperDoll.set_textures(PixelArt.character(palette), PixelArt.character_back(palette))
+	var skin := _pick_skin()
+	skin_id = skin.get("id", "")
+	if skin.is_empty():
+		var palette: Dictionary = ELITE_PALETTE if elite else PALETTE
+		$PaperDoll.set_textures(PixelArt.character(palette), PixelArt.character_back(palette))
+	else:
+		$PaperDoll.set_look(PixelArt.character_look(skin))
+	smitten = skin_id != "" and COUPLE.get(Economy.equipped_character, "") == skin_id
+	_heart = Label3D.new()
+	_heart.text = "<3"
+	_heart.font = UiKit.title_font()
+	_heart.font_size = 120
+	_heart.outline_size = 30
+	_heart.pixel_size = 0.008
+	_heart.modulate = Color(1.0, 0.45, 0.65)
+	_heart.outline_modulate = Color(0.35, 0.02, 0.12)
+	_heart.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_heart.no_depth_test = true
+	_heart.position = Vector3(0.0, 2.75, 0.0)
+	_heart.visible = false
+	add_child(_heart)
 	if elite:
 		_ring.scale = Vector3.ONE * 2.4 # the fan covers a wider area
 	_move_dir = _flat(-global_basis.z).normalized()
@@ -127,6 +183,16 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if smitten and _player:
+		var close := _true_distance() < SWEET_RANGE and state >= State.CHASE and state != State.FLEE
+		if close and not _heart.visible:
+			_heart_t = 0.0
+		_heart.visible = close
+		if close:
+			_heart_t += delta
+			var pop := minf(_heart_t / 0.2, 1.0)
+			_heart.scale = Vector3.ONE * (0.4 + 0.6 * pop) * (1.0 + 0.1 * sin(_heart_t * 6.0))
+			_heart.position.y = 2.75 + 0.08 * sin(_heart_t * 3.0)
 	# The "!" pops in, then pulses until the tsinelas leaves the hand.
 	if _alert.visible:
 		_alert_time += delta
@@ -256,7 +322,7 @@ func _do_flee(delta: float) -> void:
 	if to.length() <= _flee_reach or _timer >= FLEE_GIVE_UP or (_timer > 1.0 and is_on_wall() and to.length() < _flee_reach + 3.0):
 		vanish()
 		return
-	_steer(to, FLEE_SPEED, delta)
+	_go(_flee_to, FLEE_SPEED, delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -316,6 +382,7 @@ func _look(delta: float) -> void:
 	if _look_timer <= 0.0:
 		_seen_pos = _flat(_player.global_position)
 		_seen_vel = _flat(_player.velocity)
+		_seen_y = _player.global_position.y
 		_look_timer = reaction_time * randf_range(0.7, 1.3)
 
 
@@ -324,7 +391,7 @@ func _true_distance() -> float:
 
 
 func _can_tag(reach: float) -> bool:
-	return _true_distance() <= reach
+	return _true_distance() <= reach and absf(_player.global_position.y - global_position.y) < 1.5
 
 
 # --- States -------------------------------------------------------------
@@ -332,7 +399,7 @@ func _can_tag(reach: float) -> bool:
 func _do_reset(delta: float) -> void:
 	var to_lata := _flat(_lata.global_position - global_position)
 	if to_lata.length() > 0.9 and _timer == 0.0:
-		_steer(to_lata, reset_run_speed, delta)
+		_go(_lata.global_position, reset_run_speed, delta)
 		return
 	# At the lata: stand it back up.
 	_halt()
@@ -346,6 +413,9 @@ func _do_reset(delta: float) -> void:
 
 
 func _do_chase(delta: float) -> void:
+	if smitten:
+		_follow_sweetly(delta)
+		return
 	if _can_tag(tag_distance):
 		_tag()
 		return
@@ -364,9 +434,22 @@ func _do_chase(delta: float) -> void:
 		state = State.LUNGE
 		_timer = lunge_time
 		return
-	# Run toward where it predicts you'll be.
+	# Run toward where it predicts you'll be (around houses if need be).
 	var target := _seen_pos + _seen_vel * chase_lead
-	_steer(target - _flat(global_position), chase_speed, delta)
+	target.y = _seen_y
+	_go(target, chase_speed, delta)
+
+
+## Chasing their other half: no throws, no tag, just close behind.
+func _follow_sweetly(delta: float) -> void:
+	var d := _true_distance()
+	if d <= SWEET_GAP:
+		_brake(delta)
+		_face(_flat(_player.global_position - global_position))
+		return
+	var target := _seen_pos + _seen_vel * chase_lead
+	target.y = _seen_y
+	_go(target, chase_speed * (0.8 if d < SWEET_GAP + 1.5 else 1.0), delta)
 
 
 func _do_lunge(delta: float) -> void:
@@ -406,7 +489,7 @@ func _do_pickup(delta: float) -> void:
 			slippers += 1
 		state = State.CHASE
 		return
-	_steer(to_slipper, chase_speed, delta)
+	_go(_pickup_target.global_position, chase_speed, delta)
 
 
 func _start_pickup() -> void:
@@ -430,7 +513,7 @@ func _start_wind_up(distance: float) -> void:
 	var flight_time := _flight_time(distance)
 	var lead := _seen_vel * (wind_up_time + flight_time) * lead_factor
 	var scatter := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).limit_length(1.0) * aim_error
-	_throw_target = _seen_pos + lead + scatter + Vector3(0.0, 0.03, 0.0)
+	_throw_target = _seen_pos + lead + scatter + Vector3(0.0, _seen_y + 0.03, 0.0)
 	_ring.global_position = _throw_target
 	_ring.visible = true
 	_show_alert(true)
@@ -500,6 +583,14 @@ func _clear_thrown() -> void:
 
 
 # --- Movement helpers -----------------------------------------------------
+
+## Run to a point, taking the path around houses when one is in the way.
+func _go(point: Vector3, speed: float, delta: float) -> void:
+	var dest := point
+	if ChaseNav.current:
+		dest = ChaseNav.current.route(self, point, _memo, delta)
+	_steer(_flat(dest - global_position), speed, delta)
+
 
 ## Run toward a direction with momentum: limited turning, and sharp turns
 ## cost speed (so juking the taya makes it swing wide).

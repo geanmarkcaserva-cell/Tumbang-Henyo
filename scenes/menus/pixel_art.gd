@@ -105,15 +105,19 @@ static func character_look(item: Dictionary) -> Dictionary:
 static func _load_sheets(id: String, s: Dictionary) -> Dictionary:
 	var look := {}
 	for state in STATES:
-		var path := "%s/%s_%s.png" % [s.dir, id, state]
+		# The artist's own file names can be given per state ("idle": "Kei idle.png");
+		# otherwise <id>_<state>.png.
+		var file: String = s.get(state, "%s_%s.png" % [id, state])
+		var path := "%s/%s" % [s.dir, file]
 		if not ResourceLoader.exists(path):
 			continue
 		var tex: Texture2D = load(path)
-		var frames := maxi(floori(float(tex.get_width()) / tex.get_height()), 1)
+		# Square frames: count = width / height ("<state>_frames" overrides it).
+		var frames: int = s.get(state + "_frames", maxi(floori(float(tex.get_width()) / tex.get_height()), 1))
 		var fps: float = s.get(state + "_fps", DEFAULT_FPS[state])
 		look[state] = {"texture": tex, "frames": frames, "fps": fps}
 	if not look.has("idle"):
-		push_warning("%s: %s/%s_idle.png missing, using a placeholder" % [id, s.dir, id])
+		push_warning("%s: no idle sheet in %s, using a placeholder" % [id, s.dir])
 		return {}
 	for state in ["run", "happy"]:
 		if not look.has(state):
@@ -122,7 +126,56 @@ static func _load_sheets(id: String, s: Dictionary) -> Dictionary:
 	var idle_tex: Texture2D = look.idle.texture
 	look.frame_h = idle_tex.get_height()
 	look.foot_pad = _empty_rows_below(idle_tex)
-	look.pixel_size = float(s.get("pixel_size", 0.08))
+	# Sheets drawn on the 24 px grid but saved bigger (e.g. 240 px frames, 10x)
+	# get a pixel size scaled down to match, so everyone stays the same size.
+	var px := float(s.get("pixel_size", GRID_PIXEL))
+	if look.frame_h > GRID_FRAME * 2:
+		px *= GRID_FRAME / float(look.frame_h)
+	# Big hair or antennae can't make anyone taller than MAX_HEIGHT (they'd
+	# outgrow the character select stand and tower over the others).
+	# ("cap_height": false for grown-ups like Mama and the tanods.)
+	var drawn: int = look.frame_h - look.foot_pad - _empty_rows_above(idle_tex)
+	if drawn > 0 and s.get("cap_height", true):
+		px = minf(px, MAX_HEIGHT / drawn)
+	look.pixel_size = px
+	return look
+
+
+## Metres per art pixel for characters on the 24 px grid (same as GM).
+const GRID_PIXEL := 0.095
+const GRID_FRAME := 24
+const MAX_HEIGHT := 1.75 ## metres, top of the head (or hair) to the feet
+
+
+## How many fully transparent rows are above the head (in any frame).
+static func _empty_rows_above(tex: Texture2D) -> int:
+	var img := tex.get_image()
+	if img == null:
+		return 0
+	if img.is_compressed():
+		img.decompress()
+	for y in img.get_height():
+		for x in img.get_width():
+			if img.get_pixel(x, y).a > 0.5:
+				return y
+	return 0
+
+
+## One sheet for every state: the barangay folk (art/characters/Npc*) are
+## drawn facing front only. Cached by path.
+static func single_sheet_look(path: String, fps: float = 5.0) -> Dictionary:
+	if _looks.has(path):
+		return _looks[path]
+	var tex: Texture2D = load(path)
+	var h := tex.get_height()
+	var sheet := {"texture": tex, "frames": maxi(floori(float(tex.get_width()) / h), 1), "fps": fps}
+	var foot := _empty_rows_below(tex)
+	var px := GRID_PIXEL * GRID_FRAME / float(h) if h > GRID_FRAME * 2 else GRID_PIXEL
+	var drawn := h - foot - _empty_rows_above(tex)
+	if drawn > 0:
+		px = minf(px, MAX_HEIGHT / drawn)
+	var look := {"idle": sheet, "run": sheet, "happy": sheet, "frame_h": h, "foot_pad": foot, "pixel_size": px}
+	_looks[path] = look
 	return look
 
 

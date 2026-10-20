@@ -2,7 +2,8 @@ class_name TouchControls
 extends Control
 ## On-screen controls for phones and touchscreens (Settings > Touch controls).
 ##
-##   Left side   floating joystick: put a thumb down anywhere, drag to move.
+##   Left side   joystick fixed in the bottom-left corner: put a thumb down
+##               anywhere on the left side and drag; the base never moves.
 ##   Right side  drag to look / aim.
 ##   Buttons     Run:   Jump (big), Sprint (hold), Look back (hold).
 ##               Throw: one big Throw button: hold to charge, release to throw.
@@ -15,8 +16,16 @@ extends Control
 ##
 ## Without a touchscreen (testing on PC with the setting on) the mouse stands
 ## in for one finger.
+##
+## Players can move every control and change their size (Settings > Touch
+## buttons -> TouchLayoutEditor, saved in Settings.touch_layout/touch_scale).
+## In `editing` mode all controls show at once and dragging one moves it.
 
 signal look(relative: Vector2) ## drag on the right side, in design pixels
+signal layout_edited ## a control was dragged (editing mode)
+
+## The controls that can be moved, with a label for the layout editor.
+const MOVABLE := {"stick": "Move", "jump": "Jump", "sprint": "Sprint", "back": "Look back", "throw": "Throw"}
 
 ## True while the on-screen controls are in charge of input.
 static var active := false
@@ -45,6 +54,14 @@ var _down := {} ## button name -> true while held
 var _mouse_is_finger := false
 var _slipper_icon: Texture2D
 var _sprint_icon: Texture2D = preload("res://art/ui/hud/icon_sprint.webp")
+var _stick_pos := Vector2.ZERO ## where the joystick sits (see _layout)
+
+## Layout editor mode: everything shows, drags move controls, nothing is sent
+## to the game. `layout` / `scale_mult` are the editor's working copy.
+var editing := false
+var layout := {}
+var scale_mult := 1.0
+var _drag_id := ""
 
 
 func _ready() -> void:
@@ -56,6 +73,14 @@ func _ready() -> void:
 	if item.has("icon") and ResourceLoader.exists(item.icon):
 		_slipper_icon = load(item.icon)
 	resized.connect(_layout)
+	if not editing:
+		layout = Settings.touch_layout
+		scale_mult = Settings.touch_scale
+		Settings.changed.connect(func():
+			if not editing:
+				layout = Settings.touch_layout
+				scale_mult = Settings.touch_scale
+				_layout())
 	_layout()
 
 
@@ -65,7 +90,8 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
-	active = visible
+	if not editing:
+		active = visible
 	var screen := get_viewport_rect().size
 	if size != screen: # always cover the whole screen (works under a bare CanvasLayer)
 		position = Vector2.ZERO
@@ -75,21 +101,50 @@ func _process(_delta: float) -> void:
 		queue_redraw()
 
 
-## Thumb-zone layout, scaled to the screen height.
+## Thumb-zone layout, scaled to the screen height, then the player's own
+## positions and size (Settings.touch_layout / touch_scale) on top.
 func _layout() -> void:
 	var s := size
-	var u := s.y / 1080.0
+	if s.x < 1.0 or s.y < 1.0:
+		return
+	var u := _unit()
+	var k := scale_mult
 	_buttons = {
-		"jump": {"pos": Vector2(s.x - 210 * u, s.y - 220 * u), "r": 96 * u, "ctx": "run"},
-		"sprint": {"pos": Vector2(s.x - 430 * u, s.y - 150 * u), "r": 78 * u, "ctx": "run"},
-		"back": {"pos": Vector2(s.x - 200 * u, s.y - 450 * u), "r": 60 * u, "ctx": "run"},
-		"throw": {"pos": Vector2(s.x - 250 * u, s.y - 270 * u), "r": 128 * u, "ctx": "throw"},
+		"jump": {"pos": default_pos("jump", s), "r": 96 * u * k, "ctx": "run"},
+		"sprint": {"pos": default_pos("sprint", s), "r": 78 * u * k, "ctx": "run"},
+		"back": {"pos": default_pos("back", s), "r": 60 * u * k, "ctx": "run"},
+		"throw": {"pos": default_pos("throw", s), "r": 128 * u * k, "ctx": "throw"},
 	}
+	_stick_pos = default_pos("stick", s)
+	for id in layout:
+		var f: Vector2 = layout[id]
+		var p := Vector2(f.x * s.x, f.y * s.y)
+		if id == "stick":
+			_stick_pos = p
+		elif _buttons.has(id):
+			_buttons[id].pos = p
 	queue_redraw()
+
+
+## Where a control sits by default on a screen of size `s`.
+static func default_pos(id: String, s: Vector2) -> Vector2:
+	var u := s.y / 1080.0
+	match id:
+		"jump": return Vector2(s.x - 210 * u, s.y - 220 * u)
+		"sprint": return Vector2(s.x - 430 * u, s.y - 150 * u)
+		"back": return Vector2(s.x - 200 * u, s.y - 450 * u)
+		"throw": return Vector2(s.x - 250 * u, s.y - 270 * u)
+		"stick": return Vector2(250 * u, s.y - 250 * u)
+	return s * 0.5
 
 
 func _unit() -> float:
 	return size.y / 1080.0
+
+
+## The joystick's base radius (grows with the size setting).
+func _stick_r() -> float:
+	return 120.0 * _unit() * scale_mult
 
 
 ## Screen rect of a button (for the tutorial's highlight ring).
@@ -100,19 +155,27 @@ func button_rect(id: String) -> Rect2:
 	return Rect2(b.pos - Vector2(b.r, b.r), Vector2(b.r, b.r) * 2.0)
 
 
-## Screen rect of the joystick's resting spot.
+## Screen rect of the joystick (it always sits in the same spot).
 func stick_rect() -> Rect2:
 	if not visible:
 		return Rect2()
-	var u := _unit()
-	return Rect2(Vector2(140 * u, size.y - 360 * u), Vector2(220 * u, 220 * u))
+	var r := _stick_r()
+	return Rect2(_stick_centre() - Vector2(r, r), Vector2(r, r) * 2.0)
+
+
+## Where the joystick lives (bottom-left unless the player moved it).
+func _stick_centre() -> Vector2:
+	return _stick_pos
 
 
 # --- Input ------------------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
-	if not visible or context == "none" or context == "quiz":
+	if editing:
+		_edit_input(event)
 		return
+	if not visible or context == "none" or context == "quiz" or get_tree().paused:
+		return # (paused: the pause menu and its settings get the taps)
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_finger_down(event.index, event.position)
@@ -135,10 +198,10 @@ func _finger_down(index: int, pos: Vector2) -> void:
 	if b != "":
 		_touches[index] = {"kind": "button", "name": b}
 		_press_button(b)
-	elif pos.x < size.x * 0.45 and pos.y > size.y * 0.25:
+	elif _in_stick_zone(pos):
 		_touches[index] = {"kind": "stick"}
-		_stick_origin = pos
-		_stick_vec = Vector2.ZERO
+		_stick_origin = _stick_centre() # fixed base: the thumb only moves the knob
+		_update_stick(pos)
 	elif pos.y > size.y * 0.14: # leave the top strip for the pause button
 		_touches[index] = {"kind": "look"}
 	queue_redraw()
@@ -150,19 +213,28 @@ func _finger_move(index: int, pos: Vector2, relative: Vector2) -> void:
 	var t: Dictionary = _touches[index]
 	match t.kind:
 		"stick":
-			var radius := 120.0 * _unit()
-			var d := pos - _stick_origin
-			if d.length() > radius: # the base follows the thumb past its edge
-				_stick_origin = pos - d.limit_length(radius)
-				d = pos - _stick_origin
-			_stick_vec = d / radius
-			_apply_stick()
-			queue_redraw()
+			_update_stick(pos)
 		"look":
 			look.emit(relative / _unit())
 		"button":
 			if t.name == "throw" or t.name == "sprint": # aim while holding
 				look.emit(relative / _unit() * 0.6)
+
+
+## A thumb here works the joystick: near it, or anywhere on its side of the
+## screen (below the top strip) when it sits on the left.
+func _in_stick_zone(pos: Vector2) -> bool:
+	if pos.distance_to(_stick_centre()) <= _stick_r() * 2.2:
+		return true
+	return _stick_centre().x < size.x * 0.5 and pos.x < size.x * 0.45 and pos.y > size.y * 0.25
+
+
+## Knob toward the thumb, clamped to the base's rim (the base stays put).
+func _update_stick(pos: Vector2) -> void:
+	var radius := _stick_r()
+	_stick_vec = ((pos - _stick_origin) / radius).limit_length(1.0)
+	_apply_stick()
+	queue_redraw()
 
 
 func _finger_up(index: int) -> void:
@@ -246,9 +318,91 @@ func _release_all() -> void:
 	_stick_vec = Vector2.ZERO
 
 
+# --- Layout editing ------------------------------------------------------------
+
+func _edit_input(event: InputEvent) -> void:
+	var pos := Vector2.ZERO
+	var pressed := false
+	var released := false
+	var moved := false
+	if event is InputEventScreenTouch:
+		pos = event.position
+		pressed = event.pressed
+		released = not event.pressed
+	elif event is InputEventScreenDrag:
+		pos = event.position
+		moved = true
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		pos = event.position
+		pressed = event.pressed
+		released = not event.pressed
+	elif event is InputEventMouseMotion:
+		pos = event.position
+		moved = _drag_id != ""
+	else:
+		return
+	if not get_global_rect().has_point(pos) and not released:
+		return
+	if pressed:
+		_drag_id = _control_at(pos)
+	elif released:
+		_drag_id = ""
+	elif moved and _drag_id != "":
+		var r := _stick_r() if _drag_id == "stick" else float(_buttons[_drag_id].r)
+		var p := pos.clamp(Vector2(r, r), size - Vector2(r, r))
+		layout[_drag_id] = Vector2(p.x / size.x, p.y / size.y)
+		_layout()
+		layout_edited.emit()
+		get_viewport().set_input_as_handled()
+
+
+func _control_at(pos: Vector2) -> String:
+	var best := ""
+	var best_d := INF
+	for id in _buttons:
+		if _buttons[id].ctx != context:
+			continue
+		var d: float = pos.distance_to(_buttons[id].pos)
+		if d <= _buttons[id].r * 1.2 and d < best_d:
+			best = id
+			best_d = d
+	var ds := pos.distance_to(_stick_centre())
+	if ds <= _stick_r() * 1.1 and ds < best_d:
+		best = "stick"
+	return best
+
+
+func set_editing_scale(k: float) -> void:
+	scale_mult = k
+	_layout()
+
+
+func _draw_editing() -> void:
+	var u := _unit()
+	var f := UiKit.title_font()
+	var fs := int(28 * u)
+	_draw_stick_rest(Color(1, 0.8, 0.34, 0.9) if _drag_id == "stick" else Color(1, 1, 1, 0.75))
+	_edit_label(f, fs, _stick_centre() + Vector2(0, _stick_r() + 30 * u), MOVABLE.stick)
+	for id in _buttons:
+		if _buttons[id].ctx != context:
+			continue # the editor shows the running or the throwing buttons
+		_draw_button(id, id == _drag_id)
+		var b: Dictionary = _buttons[id]
+		_edit_label(f, fs, b.pos + Vector2(0, b.r + 30 * u), MOVABLE[id])
+
+
+func _edit_label(f: Font, fs: int, at: Vector2, text: String) -> void:
+	var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_string_outline(f, at - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, int(8 * _unit()), UiKit.TEXT_OUTLINE)
+	draw_string(f, at - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+
+
 # --- Drawing ------------------------------------------------------------------
 
 func _draw() -> void:
+	if editing:
+		_draw_editing()
+		return
 	if context != "run" and context != "throw":
 		return
 	var u := _unit()
@@ -258,56 +412,65 @@ func _draw() -> void:
 		if t.kind == "stick":
 			stick_active = true
 	if stick_active:
-		var base_r := 120.0 * u
+		var base_r := _stick_r()
 		draw_circle(_stick_origin, base_r, FILL)
 		draw_arc(_stick_origin, base_r, 0, TAU, 64, TINT, 3.0 * u, true)
 		var knob := _stick_origin + _stick_vec * base_r
 		if _stick_vec.length() > 0.1: # glow toward where you're pushing
 			var a := _stick_vec.angle()
 			draw_arc(_stick_origin, base_r, a - 0.5, a + 0.5, 24, Color(1, 0.8, 0.34, 0.85), 6.0 * u, true)
-		draw_circle(knob + Vector2(0, 4 * u), 54 * u, Color(0, 0, 0, 0.25))
-		draw_circle(knob, 54 * u, Color(1, 1, 1, 0.82))
-		draw_arc(knob, 54 * u, 0, TAU, 48, Color(0, 0, 0, 0.15), 2.0 * u, true)
-	else:
-		var rest := Vector2(250 * u, size.y - 250 * u)
-		draw_arc(rest, 110 * u, 0, TAU, 64, Color(1, 1, 1, 0.18), 3.0 * u, true)
-		draw_circle(rest, 44 * u, Color(1, 1, 1, 0.14))
-		_chevrons(rest, 78 * u, Color(1, 1, 1, 0.22))
-
+		var kr := base_r * 0.45
+		draw_circle(knob + Vector2(0, 4 * u), kr, Color(0, 0, 0, 0.25))
+		draw_circle(knob, kr, Color(1, 1, 1, 0.82))
+		draw_arc(knob, kr, 0, TAU, 48, Color(0, 0, 0, 0.15), 2.0 * u, true)
+	else: # resting: the same base in the same spot, a little fainter
+		_draw_stick_rest(Color(1, 1, 1, 0.3))
 	for id in _buttons:
-		var b: Dictionary = _buttons[id]
-		if b.ctx != context:
-			continue
-		var held: bool = _down.has(id)
-		var r: float = b.r * (0.93 if held else 1.0)
-		var p: Vector2 = b.pos
-		draw_circle(p + Vector2(0, 5 * u), r, Color(0, 0, 0, 0.18))
-		draw_circle(p, r, PRESSED if held else FILL)
-		draw_arc(p, r, 0, TAU, 64, Color(1, 1, 1, 0.75) if held else TINT, 3.0 * u, true)
-		match id:
-			"jump":
-				_chevron_up(p + Vector2(0, -6 * u), r * 0.42, Color.WHITE, 9.0 * u)
-				_chevron_up(p + Vector2(0, r * 0.26), r * 0.3, Color(1, 1, 1, 0.55), 7.0 * u)
-			"sprint":
-				var s := r * 1.25
-				draw_texture_rect(_sprint_icon, Rect2(p - Vector2(s, s) * 0.5, Vector2(s, s)), false)
-			"back":
-				_turn_arrow(p, r * 0.5, Color.WHITE, 6.0 * u)
-			"throw":
-				if power > 0.0:
-					var col := Color(0.95, 0.3, 0.3).lerp(Color(1, 0.85, 0.2), minf(power * 2.0, 1.0))
-					if power > 0.5:
-						col = Color(1, 0.85, 0.2).lerp(Color(0.4, 0.95, 0.45), (power - 0.5) * 2.0)
-					draw_arc(p, r + 12 * u, -PI * 0.5, -PI * 0.5 + TAU * power, 64, col, 12.0 * u, true)
-				if _slipper_icon:
-					var s := r * 1.15
-					draw_texture_rect(_slipper_icon, Rect2(p - Vector2(s, s) * 0.5 + Vector2(0, -8 * u), Vector2(s, s)), false)
-				var f := UiKit.title_font()
-				var fs := int(30 * u)
-				var label := "Release!" if held else "Hold"
-				var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-				draw_string_outline(f, p + Vector2(-w * 0.5, r * 0.72), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, int(8 * u), UiKit.TEXT_OUTLINE)
-				draw_string(f, p + Vector2(-w * 0.5, r * 0.72), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		if _buttons[id].ctx == context:
+			_draw_button(id, _down.has(id))
+
+
+func _draw_stick_rest(col: Color) -> void:
+	var rest := _stick_centre()
+	var r := _stick_r()
+	draw_circle(rest, r, Color(FILL, FILL.a * 0.7))
+	draw_arc(rest, r, 0, TAU, 64, col, 3.0 * _unit(), true)
+	draw_circle(rest, r * 0.45, Color(1, 1, 1, 0.22))
+	_chevrons(rest, r * 0.7, col)
+
+
+func _draw_button(id: String, held: bool) -> void:
+	var u := _unit()
+	var b: Dictionary = _buttons[id]
+	var r: float = b.r * (0.93 if held else 1.0)
+	var p: Vector2 = b.pos
+	draw_circle(p + Vector2(0, 5 * u), r, Color(0, 0, 0, 0.18))
+	draw_circle(p, r, PRESSED if held else FILL)
+	draw_arc(p, r, 0, TAU, 64, Color(1, 1, 1, 0.75) if held else TINT, 3.0 * u, true)
+	match id:
+		"jump":
+			_chevron_up(p + Vector2(0, -6 * u), r * 0.42, Color.WHITE, 9.0 * u)
+			_chevron_up(p + Vector2(0, r * 0.26), r * 0.3, Color(1, 1, 1, 0.55), 7.0 * u)
+		"sprint":
+			var s := r * 1.25
+			draw_texture_rect(_sprint_icon, Rect2(p - Vector2(s, s) * 0.5, Vector2(s, s)), false)
+		"back":
+			_turn_arrow(p, r * 0.5, Color.WHITE, 6.0 * u)
+		"throw":
+			if power > 0.0:
+				var col := Color(0.95, 0.3, 0.3).lerp(Color(1, 0.85, 0.2), minf(power * 2.0, 1.0))
+				if power > 0.5:
+					col = Color(1, 0.85, 0.2).lerp(Color(0.4, 0.95, 0.45), (power - 0.5) * 2.0)
+				draw_arc(p, r + 12 * u, -PI * 0.5, -PI * 0.5 + TAU * power, 64, col, 12.0 * u, true)
+			if _slipper_icon:
+				var s := r * 1.15
+				draw_texture_rect(_slipper_icon, Rect2(p - Vector2(s, s) * 0.5 + Vector2(0, -8 * u), Vector2(s, s)), false)
+			var f := UiKit.title_font()
+			var fs := int(30 * u)
+			var label := "Release!" if held else "Hold"
+			var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			draw_string_outline(f, p + Vector2(-w * 0.5, r * 0.72), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, int(8 * u), UiKit.TEXT_OUTLINE)
+			draw_string(f, p + Vector2(-w * 0.5, r * 0.72), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 
 
 func _chevron_up(c: Vector2, w: float, col: Color, width: float) -> void:

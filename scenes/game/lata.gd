@@ -17,9 +17,40 @@ var _last_vel := Vector3.ZERO
 var _sound_cd := 0.0
 
 
+## The can's look: the textured can model (art/sk_court/can.glb) fitted to
+## the collision cylinder (0.4 m tall, 0.15 m radius). The plain red
+## cylinder stays as a fallback.
+const CAN_MODEL := "res://art/sk_court/can.glb"
+const CAN_HEIGHT := 0.4
+const CAN_RADIUS := 0.15
+
+
 func _ready() -> void:
 	_home = global_position
 	add_to_group("lata")
+	_dress()
+
+
+func _dress() -> void:
+	if not ResourceLoader.exists(CAN_MODEL):
+		return
+	var can: Node3D = (load(CAN_MODEL) as PackedScene).instantiate()
+	var holder := Node3D.new()
+	holder.name = "CanModel"
+	add_child(holder)
+	holder.add_child(can)
+	var box := EasterEggs.bounds(can)
+	if box.size.y <= 0.0001:
+		holder.queue_free()
+		return
+	var ky := CAN_HEIGHT / box.size.y
+	var kxz := CAN_RADIUS * 2.0 / maxf(box.size.x, box.size.z)
+	can.scale = Vector3(kxz, ky, kxz)
+	var c := box.get_center()
+	can.position = Vector3(-c.x * kxz, -c.y * ky, -c.z * kxz)
+	var plain := get_node_or_null("Mesh") as Node3D
+	if plain:
+		plain.visible = false
 
 
 func _physics_process(delta: float) -> void:

@@ -122,7 +122,7 @@ func on_quiz_shown() -> void:
 		return
 	_go(Step.QUIZ)
 	_coach(1, "Answer the question", "Faster answers score more.",
-			{"keys": [["1", "2", "3"], "or click an answer"]}, "Tap an answer. Faster scores more.")
+			{"keys": [[Settings.key_name("answer_a"), Settings.key_name("answer_b"), Settings.key_name("answer_c")], "or click an answer"]}, "Tap an answer. Faster scores more.")
 	_hud.highlight("quiz")
 
 
@@ -152,7 +152,7 @@ func on_throw_begin() -> void:
 	_go(Step.MOVE)
 	_move_start = _player.global_position
 	_coach(2, "Step up to the line", "Walk up behind the yellow line.",
-			{"keys": [["W", "A", "S", "D"], "Move"]}, "Drag on the left side to move.")
+			{"keys": [_move_keys(), "Move"]}, "Drag on the left side to move.")
 	_hud.highlight("stick" if _touch() else "")
 
 
@@ -181,7 +181,7 @@ func on_run() -> void:
 	_go(Step.RUN)
 	_show_marker(true)
 	_coach(5, "Tumba! Run!", "Reach the glowing finish line.",
-			{"keys": [["W", "A", "S", "D"], "Run"]}, "Use the joystick to run to the light.")
+			{"keys": [_move_keys(), "Run"]}, "Use the joystick to run to the light.")
 	_hud.highlight("")
 
 
@@ -280,21 +280,27 @@ func _enter_charge() -> void:
 	_hud.highlight("throw_button" if _touch() else "power")
 
 
+## The player's movement keys (Settings > Controls), in W A S D order.
+func _move_keys() -> Array:
+	return [Settings.key_name("move_forward"), Settings.key_name("move_left"),
+			Settings.key_name("move_back"), Settings.key_name("move_right")]
+
+
 func _charge_keys() -> Dictionary:
-	return {"keys": [["Hold LMB"], "Charge"], "keys2": [["Release"], "Throw"]}
+	return {"keys": [["Hold " + Settings.key_name("throw")], "Charge"], "keys2": [["Release"], "Throw"]}
 
 
 func _enter_sprint() -> void:
 	_go(Step.SPRINT)
 	_coach(5, "Sprint!", "Faster than the taya, but it uses Energy.",
-			{"keys": [["Shift"], "Hold to sprint"]}, "Hold the shoe button to sprint.")
+			{"keys": [[Settings.key_name("sprint")], "Hold to sprint"]}, "Hold the shoe button to sprint.")
 	_hud.highlight("energy")
 
 
 func _show_dodge() -> void:
 	_go(Step.DODGE)
 	_coach(5, "The taya is coming!", "Don't get tagged.",
-			{"keys": [["Space"], "Jump"], "keys2": [["Q"], "Look back"]}, "Jump to dodge. Don't get tagged!")
+			{"keys": [[Settings.key_name("jump")], "Jump"], "keys2": [[Settings.key_name("look_back")], "Look back"]}, "Jump to dodge. Don't get tagged!")
 	_hud.highlight("")
 
 

@@ -18,7 +18,10 @@ const BOARD_PATH := "user://leaderboard.cfg"
 const BOARD_SIZE := 7
 
 var selected_theme := "history"
-var player_name := "Ikaw" ## until players can type a name
+## The name on the device leaderboard: the current account's.
+var player_name: String:
+	get:
+		return Accounts.current_name()
 
 
 func theme_name(theme_id: String) -> String:

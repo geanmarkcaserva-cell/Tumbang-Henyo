@@ -245,6 +245,8 @@ func _load_name() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
 		_name.text = cfg.get_value("lobby", "name", "")
+	if _name.text == "" and Accounts.has_any():
+		_name.text = Accounts.current_name() # start from the account's name
 
 
 func _save_name() -> void:

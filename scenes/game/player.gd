@@ -22,7 +22,7 @@ signal stamina_changed(value: float, max_value: float)
 @export var sprint_fov := 80.0
 
 @export_group("Jump")
-@export var jump_velocity := 5.0 ## about 1.2 m high
+@export var jump_velocity := 7.0 ## about 2.5 m high: enough to parkour onto crates and low roofs
 @export var jump_boost := 1.6 ## m/s added in the direction you're moving, per jump
 @export var max_air_speed := 10.5 ## cap for chained (bunny-hop) jumps
 @export var air_control := 0.35 ## steering in the air vs on the ground

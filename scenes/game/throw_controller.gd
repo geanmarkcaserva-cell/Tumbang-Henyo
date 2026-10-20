@@ -116,8 +116,10 @@ func _launch_velocity() -> Vector3:
 	return dir * lerpf(min_speed, max_speed, power)
 
 
+## The equipped slipper's wind resistance cuts the push (Bakya the most,
+## the Enchanted one isn't pushed at all). Used for the aim preview too.
 func _wind_accel() -> Vector3:
-	return Vector3(wind.x, 0.0, wind.z) * wind_factor
+	return Vector3(wind.x, 0.0, wind.z) * wind_factor * (1.0 - clampf(Economy.wind_resist(), 0.0, 1.0))
 
 
 func _draw_preview() -> void:

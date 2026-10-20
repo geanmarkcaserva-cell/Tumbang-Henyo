@@ -31,17 +31,26 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
+	# Everything sits on a 1920x1080 stage kept in the middle of the screen,
+	# so wide phones show it centred too.
+	var stage := preload("res://scenes/menus/tips_loading.gd").make_stage()
+	add_child(stage)
+
 	_mascot = _build_mascot()
-	_mascot.position = Vector2(960, 540)
-	add_child(_mascot)
+	_mascot.position = Vector2(960, 500)
+	stage.add_child(_mascot)
 
-	_explainer = UiKit.label("", 24, Color(1, 1, 1, 0.85))
-	_explainer.position = Vector2(40, 1000)
-	add_child(_explainer)
+	_loading = UiKit.title("Loading", 52, Color.WHITE, 0)
+	_loading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading.position = Vector2(660, 850)
+	_loading.size = Vector2(600, 70)
+	stage.add_child(_loading)
 
-	_loading = UiKit.title("Loading", 48, Color.WHITE, 0)
-	_loading.position = Vector2(1640, 990)
-	add_child(_loading)
+	_explainer = UiKit.label("", 28, Color(1, 1, 1, 0.75))
+	_explainer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_explainer.position = Vector2(460, 930)
+	_explainer.size = Vector2(1000, 50)
+	stage.add_child(_explainer)
 
 	ResourceLoader.load_threaded_request(GameManager.MAIN_MENU)
 

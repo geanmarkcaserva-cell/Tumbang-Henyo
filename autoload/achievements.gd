@@ -8,7 +8,8 @@ extends CanvasLayer
 
 signal unlocked(id: String)
 
-const SAVE_PATH := "user://achievements.cfg"
+## Saved per account: Accounts.path("achievements.cfg").
+const SAVE_FILE := "achievements.cfg"
 ## Testing: wipe every achievement each time the game starts, so they can
 ## all be earned again. Set to false for release.
 const RESET_ON_LAUNCH := true
@@ -43,11 +44,28 @@ const LIST := [
 	{"id": "mamas_home", "name": "Mama's Home", "desc": "Stay out until 6:00 PM.", "tier": "gold", "secret": true},
 	{"id": "nakauwi", "name": "Nakauwi Na!", "desc": "Make it home before Mama catches you.", "tier": "gold", "secret": true},
 	{"id": "hanger_dodger", "name": "Hanger Dodger", "desc": "Get home without a hanger or walis hitting you.", "tier": "platinum", "secret": true},
+	# Secrets around the barangay (EasterEggs)
+	{"id": "egg_trumpo", "name": "Paikot-ikot", "desc": "Find the trumpo on a rooftop.", "tier": "silver"},
+	{"id": "egg_golden", "name": "Gintong Tsinelas", "desc": "Find the golden tsinelas.", "tier": "silver"},
+	{"id": "egg_tungkod", "name": "Tungkod ni Lolo", "desc": "Find Lolo's tungkod in an alley.", "tier": "silver"},
+	{"id": "egg_kite", "name": "Saranggola", "desc": "Get the kite stuck on a roof.", "tier": "silver"},
+	{"id": "egg_marble", "name": "Higanteng Holen", "desc": "Climb to the big marble.", "tier": "gold"},
+	{"id": "all_eggs", "name": "Kumpleto!", "desc": "Find all five hidden items. Something waits after Mama's round...", "tier": "platinum", "secret": true},
+	{"id": "night_out", "name": "Gabi Na", "desc": "Keep playing with your friends after Mama's round.", "tier": "gold", "secret": true},
+	{"id": "curfew", "name": "Takas sa Tanod", "desc": "Get home before the tanods catch you at 7:00 PM.", "tier": "platinum", "secret": true},
 	# Score and shop
 	{"id": "big_score", "name": "High Scorer", "desc": "Score 10,000 points in one run.", "tier": "gold"},
 	{"id": "legend", "name": "Alamat", "desc": "Score 15,000 points in one run.", "tier": "platinum"},
 	{"id": "collector", "name": "Tansan Collector", "desc": "Have 1,000 tansan.", "tier": "platinum"},
 	{"id": "shopper", "name": "Suki ng Tindahan", "desc": "Buy something from the shop.", "tier": "bronze"},
+	{"id": "new_friend", "name": "New Friend", "desc": "Buy a character.", "tier": "bronze"},
+	{"id": "barkada", "name": "Barkada", "desc": "Own 4 characters.", "tier": "silver"},
+	{"id": "whole_barkada", "name": "The Whole Barkada", "desc": "Own every character.", "tier": "gold"},
+	{"id": "fresh_pair", "name": "Fresh Pair", "desc": "Buy a pair of tsinelas.", "tier": "bronze"},
+	{"id": "shoe_rack", "name": "Shoe Rack", "desc": "Own 4 pairs of tsinelas.", "tier": "silver"},
+	{"id": "tsinelas_collector", "name": "Tsinelas Collector", "desc": "Own every pair of tsinelas.", "tier": "gold"},
+	{"id": "half_heart", "name": "Half a Heart", "desc": "Buy GM or Ashiela. Somewhere, their other half is waiting.", "tier": "platinum", "secret": true},
+	{"id": "full_heart", "name": "Full Heart", "desc": "Buy both GM and Ashiela. Together again.", "tier": "platinum", "secret": true},
 	# Class and teacher
 	{"id": "quiz_maker", "name": "Quiz Maker", "desc": "Save your own custom quiz.", "tier": "bronze"},
 	{"id": "classmate", "name": "Classmate", "desc": "Join a class game.", "tier": "bronze"},
@@ -236,7 +254,7 @@ func _build_toast() -> void:
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) != OK:
+	if cfg.load(Accounts.path(SAVE_FILE)) != OK:
 		return
 	_unlocked = cfg.get_value("achievements", "unlocked", {})
 	_stats = cfg.get_value("achievements", "stats", {})
@@ -246,7 +264,14 @@ func _save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("achievements", "unlocked", _unlocked)
 	cfg.set_value("achievements", "stats", _stats)
-	cfg.save(SAVE_PATH)
+	cfg.save(Accounts.path(SAVE_FILE))
+
+
+## Another account was picked: show its trophies instead.
+func reload() -> void:
+	_unlocked.clear()
+	_stats.clear()
+	_load()
 
 
 ## Debug: clear everything (call from the editor's runtime tools).

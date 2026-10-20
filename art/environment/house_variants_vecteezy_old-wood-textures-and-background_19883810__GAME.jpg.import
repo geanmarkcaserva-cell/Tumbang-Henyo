@@ -1,0 +1,45 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://dfftwp6e21h34"
+path.s3tc="res://.godot/imported/house_variants_vecteezy_old-wood-textures-and-background_19883810__GAME.jpg-876ab410e509ca37740ab3d7e58b1ad5.s3tc.ctex"
+path.etc2="res://.godot/imported/house_variants_vecteezy_old-wood-textures-and-background_19883810__GAME.jpg-876ab410e509ca37740ab3d7e58b1ad5.etc2.ctex"
+metadata={
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
+}
+generator_parameters={
+"md5": "d3e367717a953f1d5a3518bf0b1cd0da"
+}
+
+[deps]
+
+source_file="res://art/environment/house_variants_vecteezy_old-wood-textures-and-background_19883810__GAME.jpg"
+dest_files=["res://.godot/imported/house_variants_vecteezy_old-wood-textures-and-background_19883810__GAME.jpg-876ab410e509ca37740ab3d7e58b1ad5.s3tc.ctex", "res://.godot/imported/house_variants_vecteezy_old-wood-textures-and-background_19883810__GAME.jpg-876ab410e509ca37740ab3d7e58b1ad5.etc2.ctex"]
+
+[params]
+
+compress/mode=2
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/uastc_level=0
+compress/rdo_quality_loss=0.0
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/channel_remap/red=0
+process/channel_remap/green=1
+process/channel_remap/blue=2
+process/channel_remap/alpha=3
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=0

@@ -10,8 +10,12 @@ extends Node
 
 const START_MIN := 17.0 * 60.0 ## 5:00 PM = golden hour (the court as built)
 const SPAN_MIN := 60.0 ## 6:00 PM = blue hour
-const MAX_T := 1.45 ## a little past 6 (Mama's round) = night
+const NIGHT_T := 1.45 ## a little past 6 (Mama's round) = night
+const MAX_T := 2.0 ## 7:00 PM (the secret curfew round) = deep night
 const BLEND_TIME := 2.5 ## seconds to ease to a new time of day
+## Street lamps and post lamps switch on at 5:40 PM (t = 40 / 60), with a
+## short warm-up.
+const LAMPS_ON_T := 40.0 / 60.0
 
 ## Keyframes: t (0 = 5 PM, 1 = 6 PM) -> look.
 const KEYS := [
@@ -27,10 +31,14 @@ const KEYS := [
 		"ghor": Color(0.3, 0.2, 0.28), "sun": Color(0.55, 0.55, 0.85), "sun_e": 0.35, "elev": 3.0,
 		"amb": Color(0.42, 0.44, 0.66), "amb_e": 0.45, "fog": Color(0.22, 0.22, 0.34), "sky_e": 0.6, "lamp": 1.0,
 		"tint": Color(0.34, 0.34, 0.5)},
-	{"t": MAX_T, "top": Color(0.02, 0.03, 0.09), "hor": Color(0.1, 0.11, 0.2), "gbot": Color(0.02, 0.02, 0.04),
+	{"t": NIGHT_T, "top": Color(0.02, 0.03, 0.09), "hor": Color(0.1, 0.11, 0.2), "gbot": Color(0.02, 0.02, 0.04),
 		"ghor": Color(0.08, 0.08, 0.14), "sun": Color(0.5, 0.58, 0.9), "sun_e": 0.18, "elev": 25.0,
 		"amb": Color(0.3, 0.34, 0.55), "amb_e": 0.38, "fog": Color(0.08, 0.09, 0.15), "sky_e": 0.45, "lamp": 1.0,
 		"tint": Color(0.18, 0.2, 0.32)},
+	{"t": MAX_T, "top": Color(0.01, 0.015, 0.05), "hor": Color(0.05, 0.06, 0.13), "gbot": Color(0.01, 0.01, 0.03),
+		"ghor": Color(0.05, 0.05, 0.1), "sun": Color(0.5, 0.58, 0.9), "sun_e": 0.14, "elev": 35.0,
+		"amb": Color(0.26, 0.3, 0.5), "amb_e": 0.34, "fog": Color(0.05, 0.06, 0.11), "sky_e": 0.4, "lamp": 1.0,
+		"tint": Color(0.15, 0.17, 0.28)},
 ]
 
 ## Unlit things (the wind leaves) don't react to the sun, so they take this
@@ -45,6 +53,7 @@ var _sun: DirectionalLight3D
 var _sun_yaw := 0.0
 var _base_elev := 17.0
 var _lamps: Array[OmniLight3D] = []
+var _bulbs: Array[StandardMaterial3D] = []
 var _t := 0.0
 var _target := 0.0
 
@@ -69,6 +78,32 @@ func setup(world_env: WorldEnvironment, sun: DirectionalLight3D, posts: Array) -
 		add_child(lamp)
 		lamp.global_position = p
 		_lamps.append(lamp)
+
+
+## The barangay's street lamps: a light under each bulb (fading out with
+## distance, so only the nearby ones cost anything) and the bulb material to
+## make glow. The ones away from the court are skipped in low detail mode.
+func add_lamps(spots: Array, bulb: StandardMaterial3D) -> void:
+	if bulb:
+		_bulbs.append(bulb)
+	for p in spots:
+		var lamp := OmniLight3D.new()
+		lamp.light_color = Color(1.0, 0.8, 0.52)
+		lamp.omni_range = 9.0
+		lamp.omni_attenuation = 1.2
+		lamp.light_energy = 0.0
+		lamp.shadow_enabled = false
+		lamp.distance_fade_enabled = true
+		lamp.distance_fade_begin = 38.0
+		lamp.distance_fade_length = 10.0
+		lamp.visible = false
+		add_child(lamp)
+		lamp.global_position = p
+		var flat := Vector2(p.x, p.z)
+		if absf(flat.x) > 15.0 or flat.y > 16.0 or flat.y < -52.0:
+			lamp.add_to_group("detail_heavy")
+		_lamps.append(lamp)
+	_apply(_t)
 
 
 ## Clock time in minutes after midnight.
@@ -115,7 +150,9 @@ func _apply(t: float) -> void:
 		_sun.global_basis = Basis.looking_at(dir, Vector3.UP)
 	tint = a.tint.lerp(b.tint, k)
 	tint_changed.emit(tint)
-	var lamp := lerpf(a.lamp, b.lamp, k)
+	var lamp := smoothstep(LAMPS_ON_T - 0.02, LAMPS_ON_T + 0.04, t)
 	for l in _lamps:
-		l.visible = lamp > 0.01
+		l.visible = lamp > 0.01 and not (l.is_in_group("detail_heavy") and Settings.low_detail)
 		l.light_energy = lamp * 2.2
+	for m in _bulbs:
+		m.emission_energy_multiplier = lamp * 4.0

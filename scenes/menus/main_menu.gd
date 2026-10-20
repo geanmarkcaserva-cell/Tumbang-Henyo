@@ -3,8 +3,28 @@ extends Node3D
 ## main menu -> choose game mode -> select character -> select weapon -> run.
 ## Each panel has its own camera shot; switching panels glides the camera.
 
-## Where the selected character stands on the court for the close-ups.
-const PREVIEW_POS := Vector3(4.0, 0.0, -12.0)
+## Character select is a lobby, like Soul Knight's: every playable character
+## stands somewhere on the court, idling, and browsing glides the camera over
+## to whoever you're looking at. Locked ones stand there too, a little dimmer.
+## Where each one stands, left to right as the camera sees them (so < and >
+## glide the camera left and right). Proktoy, the starter, stands up front;
+## GM and Ashiela stand together at the back: they're a couple. Anyone not
+## listed here takes a FREE_SPOT.
+const LOBBY_PLACES := {
+	"kei": Vector3(-7.0, 0.0, -9.5), "lisa": Vector3(-5.2, 0.0, -23.0), "badette": Vector3(-3.2, 0.0, -12.5),
+	"gm": Vector3(-1.6, 0.0, -28.2), "ashiela": Vector3(-0.3, 0.0, -28.8), "migo": Vector3(1.0, 0.0, -13.0),
+	"proktoy": Vector3(2.8, 0.0, -6.8), "saisai": Vector3(4.6, 0.0, -24.5),
+}
+const FREE_SPOTS := [Vector3(-6.5, 0.0, -38.5), Vector3(6.5, 0.0, -38.0), Vector3(-7.5, 0.0, -31.0), Vector3(7.5, 0.0, -17.5)]
+## Close-up on a lobby character: camera and look-at point, relative to their
+## spot (the look point sits to their left so they stand right of the panel).
+const CHAR_CAM := Vector3(1.0, 1.15, 3.0)
+const CHAR_LOOK := Vector3(-0.6, 0.95, 0.0)
+const CHAR_FOV := 50.0
+## Weapon select: just in front of the chosen character, slipper floating beside.
+const WEAPON_CAM := Vector3(-0.5, 1.05, 2.7)
+const WEAPON_LOOK := Vector3(-0.35, 0.9, 0.0)
+const LOCKED_TINT := Color(0.45, 0.45, 0.52)
 
 const SHOTS := {
 	"main": {"pos": Vector3(7.0, 4.2, -2.0), "look": Vector3(-2.5, 1.2, -24.0), "sway": 1.0},
@@ -15,15 +35,15 @@ const SHOTS := {
 	"join": {"pos": Vector3(-6.5, 3.4, 1.0), "look": Vector3(1.5, 1.5, -26.0), "sway": 1.0},
 	"host": {"pos": Vector3(8.5, 2.4, -6.0), "look": Vector3(-3.0, 2.0, -28.0), "sway": 0.8},
 	"achievements": {"pos": Vector3(0.0, 1.6, -34.0), "look": Vector3(0.0, 3.0, -10.0), "sway": 0.8},
-	# Worm's-eye: a wide lens almost on the ground, right of the (flat) cutout and
-	# looking up past it, so its right side looms close and the left recedes.
-	"character": {"pos": Vector3(4.5, 0.28, -10.55), "look": Vector3(2.75, 1.15, -12.6), "sway": 0.05, "fov": 80.0},
-	"weapon": {"pos": Vector3(3.65, 0.95, -10.3), "look": Vector3(3.55, 0.85, -12.0), "sway": 0.08},
+	"account": {"pos": Vector3(-7.5, 1.9, -20.0), "look": Vector3(6.0, 2.4, -31.0), "sway": 0.8},
+	"collection": {"pos": Vector3(9.0, 5.5, -14.0), "look": Vector3(-14.0, 3.0, -10.0), "sway": 0.8},
+	# "character" and "weapon" follow the lobby character: see _shot().
 }
 
 ## Where Back / Esc goes from each panel.
 const BACK_OF := {
 	"mode": "main", "settings": "main", "credits": "main", "custom": "mode", "achievements": "main",
+	"account": "main", "collection": "main",
 	"character": "mode", "weapon": "character",
 }
 
@@ -46,8 +66,8 @@ var _board_title: Label
 var _board_rows: Array[Label] = []
 var _continue_btn: Button
 var _pickers := {} ## "character" / "weapon" -> picker state
-var _char_sprite: Sprite3D
-var _char_look := {}
+var _lobby := {} ## character id -> {root, sprite, look, state, since, happy}
+var _focus_id := "" ## the lobby character the camera is on
 var _custom_id := "" ## custom set open in the editor ("" = new, unsaved)
 var _custom_list: VBoxContainer
 var _custom_title: LineEdit
@@ -56,13 +76,15 @@ var _custom_status: Label
 var _custom_delete: Button
 var _host_panel: HostPanel
 var _join_panel: JoinPanel
+var _account_panel: AccountPanel
+var _ach_panel: AchievementsPanel
+var _collection_panel: CollectionPanel
+var _ach_back := "main" ## achievements opened from the main menu or from an account card
+var _account_chip: Button
 var _delete_armed := false
 var _file_dialog: FileDialog
 var _help_dialog: AcceptDialog
 var _ai_dialog: AcceptDialog
-var _char_state := "idle"
-var _char_state_since := 0.0
-var _char_happy_left := 0.0
 ## The slipper in weapon select is drawn in 2D (over the court) so its
 ## pixel art keeps its exact colours; the 3D view's tone mapping would
 ## darken and wash it out.
@@ -77,7 +99,11 @@ const SLIPPER_ICON_CENTER := Vector2(1500, 560)
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Music.play("menu")
-	_build_preview()
+	# No taya guarding the lata out here: the lobby is the barkada's.
+	var taya := get_node_or_null("Arena/Taya")
+	if taya:
+		taya.queue_free()
+	_build_lobby()
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	_panels["main"] = _build_main(ui)
@@ -92,6 +118,8 @@ func _ready() -> void:
 	_panels["join"] = _build_join(ui)
 	_panels["host"] = _build_host(ui)
 	_panels["achievements"] = _build_achievements(ui)
+	_panels["account"] = _build_account(ui)
+	_panels["collection"] = _build_collection(ui)
 	# A bit smaller than the layouts were drawn, each piece toward its own edge.
 	for key in _panels:
 		UiFx.shrink(_panels[key])
@@ -101,6 +129,8 @@ func _ready() -> void:
 		_show("host", true)
 	elif Lobby.is_client():
 		_show("join", true)
+	elif not Accounts.has_any():
+		_show("account", true) # first launch: make an account before anything else
 	else:
 		_show("main", true)
 
@@ -116,25 +146,37 @@ func _process(delta: float) -> void:
 		_slipper_icon.position.y = SLIPPER_ICON_CENTER.y - _slipper_icon.size.y * 0.5 + sin(_time * 2.4) * 10.0
 		_slipper_icon.rotation = deg_to_rad(-28.0 + sin(_time * 1.7) * 6.0)
 	_camera.fov = cam_fov
-	# The character on the stand loops idle, or happy for a moment after a pick.
-	if _char_happy_left > 0.0:
-		_char_happy_left -= delta
-		if _char_happy_left <= 0.0:
-			_set_char_sheet("idle")
-	if not _char_look.is_empty():
-		var sheet: Dictionary = _char_look[_char_state]
-		_char_sprite.frame = int((_time - _char_state_since) * sheet.fps) % _char_sprite.hframes
+	# Everyone in the lobby loops idle; happy for a moment after a pick.
+	for id in _lobby:
+		var c: Dictionary = _lobby[id]
+		if c.happy > 0.0:
+			c.happy -= delta
+			if c.happy <= 0.0:
+				_set_sheet(id, "idle")
+		var sheet: Dictionary = c.look[c.state]
+		var spr: Sprite3D = c.sprite
+		spr.frame = int((_time - float(c.since)) * sheet.fps) % spr.hframes
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
+		if _current == "account" and (_account_panel.cancel() or not Accounts.has_any()):
+			return # closed the name box, or there's no account to go back with yet
 		if BACK_OF.has(_current) and not (_current == "custom" and _custom_text.has_focus()):
 			_show(_back_of(_current))
-	elif _pickers.has(_current):
-		if event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
-			_browse(_current, -1)
-		elif event.is_action_pressed("ui_right") or event.is_action_pressed("move_right"):
-			_browse(_current, 1)
+
+
+## Left/right browse in character and weapon select. Taken here, before the
+## buttons see them, so the arrow keys don't just move the button focus.
+func _input(event: InputEvent) -> void:
+	if not _pickers.has(_current) or not _panels[_current].visible:
+		return
+	if event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
+		_browse(_current, -1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_right") or event.is_action_pressed("move_right"):
+		_browse(_current, 1)
+		get_viewport().set_input_as_handled()
 
 
 ## Back from character select returns to the custom editor when a custom
@@ -142,6 +184,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _back_of(panel_id: String) -> String:
 	if panel_id == "character" and CustomQuiz.is_custom(_selected_theme):
 		return "custom"
+	if panel_id == "achievements":
+		return _ach_back
 	return BACK_OF[panel_id]
 
 
@@ -152,6 +196,12 @@ func _show(panel_id: String, instant: bool = false) -> void:
 		_enter_custom()
 	elif panel_id == "join":
 		_join_panel.on_show()
+	elif panel_id == "achievements":
+		_ach_panel.refresh() # may be another account's trophies since last time
+	elif panel_id == "account":
+		_account_panel.refresh()
+	elif panel_id == "collection":
+		_collection_panel.refresh()
 	for key in _panels:
 		_panels[key].visible = key == panel_id
 	if _pickers.has(panel_id):
@@ -163,7 +213,23 @@ func _show(panel_id: String, instant: bool = false) -> void:
 		UiFx.pop_in(_panels[panel_id], 0.05)
 		if panel_id == "main":
 			UiFx.logo_intro(_logo, 0.0)
-	var shot: Dictionary = SHOTS[panel_id]
+	_glide(_shot(panel_id), instant)
+
+
+## The camera shot for a panel: fixed ones from SHOTS; character and weapon
+## select look at the lobby character in focus.
+func _shot(panel_id: String) -> Dictionary:
+	if panel_id == "character" or panel_id == "weapon":
+		if _focus_id == "" or not _lobby.has(_focus_id):
+			_focus_id = Economy.equipped_character if _lobby.has(Economy.equipped_character) else _lobby.keys()[0]
+		var at: Vector3 = (_lobby[_focus_id].root as Node3D).position
+		if panel_id == "character":
+			return {"pos": at + CHAR_CAM, "look": at + CHAR_LOOK, "sway": 0.06, "fov": CHAR_FOV}
+		return {"pos": at + WEAPON_CAM, "look": at + WEAPON_LOOK, "sway": 0.08}
+	return SHOTS[panel_id]
+
+
+func _glide(shot: Dictionary, instant: bool = false) -> void:
 	if _tween:
 		_tween.kill()
 	var fov: float = shot.get("fov", DEFAULT_FOV)
@@ -182,29 +248,63 @@ func _show(panel_id: String, instant: bool = false) -> void:
 
 # --- 3D preview on the court ------------------------------------------------------
 
-func _build_preview() -> void:
-	var stand := Node3D.new()
-	stand.position = PREVIEW_POS
-	add_child(stand)
-	_char_sprite = _pixel_sprite(CHARACTER_PIXEL)
-	stand.add_child(_char_sprite)
-	# Soft shadow on the court under the cutout.
-	var shadow := MeshInstance3D.new()
-	var disc := CylinderMesh.new()
-	disc.top_radius = 0.6
-	disc.bottom_radius = 0.6
-	disc.height = 0.01
-	shadow.mesh = disc
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.1, 0.05, 0.15, 0.3)
-	shadow.material_override = mat
-	shadow.scale = Vector3(1.3, 1.0, 0.8)
-	shadow.position = Vector3(0.15, 0.04, -0.1)
-	shadow.add_to_group("blob_shadow") # only in low detail mode (Settings)
-	stand.add_child(shadow)
-	_set_char_preview(Economy.find_item("character", Economy.equipped_character))
+func _build_lobby() -> void:
+	var items: Array = Economy.catalog("character")
+	var free := 0
+	for i in items.size():
+		var item: Dictionary = items[i]
+		var root := Node3D.new()
+		root.name = "Lobby_" + item.id
+		if LOBBY_PLACES.has(item.id):
+			root.position = LOBBY_PLACES[item.id]
+		else:
+			root.position = FREE_SPOTS[free % FREE_SPOTS.size()]
+			free += 1
+		add_child(root)
+		var spr := _pixel_sprite(CHARACTER_PIXEL)
+		spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y # always faces the camera
+		root.add_child(spr)
+		# Soft shadow on the court under the cutout.
+		var shadow := MeshInstance3D.new()
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.5
+		disc.bottom_radius = 0.5
+		disc.height = 0.01
+		shadow.mesh = disc
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(0.1, 0.05, 0.15, 0.3)
+		shadow.material_override = mat
+		shadow.position = Vector3(0.0, 0.04, 0.0)
+		shadow.add_to_group("blob_shadow") # only in low detail mode (Settings)
+		root.add_child(shadow)
+		var look := PixelArt.character_look(item)
+		var px: float = look.pixel_size
+		spr.pixel_size = px
+		spr.position = Vector3(0.0, look.frame_h * px * 0.5 - look.foot_pad * px, 0.0)
+		_lobby[item.id] = {"root": root, "sprite": spr, "look": look, "state": "", "since": 0.0, "happy": 0.0}
+		_set_sheet(item.id, "idle")
+	_tint_lobby()
+	_focus_id = Economy.equipped_character if _lobby.has(Economy.equipped_character) else ""
+	# The new FINISH pad at the end of the court here too.
+	var strip := get_node_or_null("Arena/Geometry/FinishStrip") as Node3D
+	var finish := get_node_or_null("Arena/FinishLine") as Node3D
+	if strip and finish:
+		strip.visible = false
+		var gate := FinishGate.new()
+		add_child(gate)
+		gate.global_position = Vector3(finish.global_position.x, 0.0, finish.global_position.z)
+
+
+func _lobby_x(id: String) -> float:
+	return (_lobby[id].root as Node3D).position.x if _lobby.has(id) else 999.0
+
+
+## Owned characters in full colour, locked ones a little dimmer.
+func _tint_lobby() -> void:
+	for id in _lobby:
+		(_lobby[id].sprite as Sprite3D).modulate = Color.WHITE if Economy.owns(id) else LOCKED_TINT
 
 
 ## Show a slipper floating beside the character in weapon select, in its
@@ -218,30 +318,33 @@ func _set_slipper_preview(item: Dictionary) -> void:
 	Enchant.apply_to_canvas(_slipper_icon, Enchant.is_enchanted(item))
 
 
-## Show a character on the stand: its front sheet (animated if it has frames),
-## feet on the ground.
+## Look at a character in the lobby (glides the camera there in character select).
 func _set_char_preview(item: Dictionary) -> void:
-	_char_look = PixelArt.character_look(item)
-	var px: float = _char_look.pixel_size
-	_char_sprite.pixel_size = px
-	_char_sprite.position = Vector3(0.0, _char_look.frame_h * px * 0.5 - _char_look.foot_pad * px, 0.0)
-	_char_happy_left = 0.0
-	_set_char_sheet("idle")
+	if not _lobby.has(item.id):
+		return
+	var changed: bool = item.id != _focus_id
+	_focus_id = item.id
+	if changed and _current == "character":
+		_glide(_shot("character"))
 
 
-func _set_char_sheet(state: String) -> void:
-	var sheet: Dictionary = _char_look[state]
-	_char_state = state
-	_char_state_since = _time
-	_char_sprite.frame = 0
-	_char_sprite.texture = sheet.texture
-	_char_sprite.hframes = maxi(sheet.frames, 1)
+func _set_sheet(id: String, state: String) -> void:
+	var c: Dictionary = _lobby[id]
+	var sheet: Dictionary = c.look[state]
+	c.state = state
+	c.since = _time
+	var spr: Sprite3D = c.sprite
+	spr.frame = 0
+	spr.texture = sheet.texture
+	spr.hframes = maxi(sheet.frames, 1)
 
 
-## The character on the stand cheers (bought or picked).
+## The character in focus cheers (bought or picked).
 func _char_celebrate(seconds: float = 1.6) -> void:
-	_char_happy_left = seconds
-	_set_char_sheet("happy")
+	if not _lobby.has(_focus_id):
+		return
+	_lobby[_focus_id].happy = seconds
+	_set_sheet(_focus_id, "happy")
 
 
 func _pixel_sprite(pixel_size: float) -> Sprite3D:
@@ -292,23 +395,50 @@ func _build_main(ui: CanvasLayer) -> Control:
 	# Plain text menu, right-aligned, no boxes: the court behind does the talking.
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 4)
-	col.position = Vector2(1300, 300)
+	col.position = Vector2(1300, 215) # eight entries: start a little higher
 	col.custom_minimum_size = Vector2(540, 0)
 	root.add_child(col)
 	var entries := [
 		["Start", func(): _show("mode")],
 		["Multiplayer", func(): _show("join")],
-		["Achievements", func(): _show("achievements")],
+		["Account", func(): _show("account")],
+		["Achievements", func():
+			_ach_back = "main"
+			_show("achievements")],
+		["Collection", func(): _show("collection")],
 		["Settings", func(): _show("settings")],
 		["Credits", func(): _show("credits")],
 		["Quit", func(): Transition.quit()],
 	]
 	for e in entries:
-		var b := UiKit.text_button(e[0], 84)
+		var b := UiKit.text_button(e[0], 76)
 		b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		b.pressed.connect(e[1])
 		col.add_child(b)
+
+	# Who's playing: the account's badge and name, top right. Tap to manage.
+	_account_chip = UiKit.button("", UiKit.BLUE, 50, Vector2(420, 112))
+	_account_chip.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_account_chip.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_account_chip.add_theme_constant_override("h_separation", 18)
+	_account_chip.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_account_chip.position = Vector2(1440, 50)
+	_account_chip.size = Vector2(420, 88)
+	_account_chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_account_chip.pressed.connect(func(): _show("account"))
+	root.add_child(_account_chip)
+	Accounts.changed.connect(_update_account_chip)
+	_update_account_chip()
 	return root
+
+
+func _update_account_chip() -> void:
+	var a := Accounts.current()
+	_account_chip.visible = not a.is_empty()
+	if a.is_empty():
+		return
+	_account_chip.text = a.name
+	_account_chip.icon = AccountPanel.avatar_texture(a, 60)
 
 
 # --- Choose game mode -----------------------------------------------------------
@@ -690,9 +820,32 @@ func _build_join(ui: CanvasLayer) -> Control:
 func _build_achievements(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
-	var panel := AchievementsPanel.new()
-	panel.back_pressed.connect(func(): _show("main"))
-	root.add_child(panel)
+	_ach_panel = AchievementsPanel.new()
+	_ach_panel.back_pressed.connect(func(): _show(_ach_back))
+	root.add_child(_ach_panel)
+	return root
+
+
+func _build_collection(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	_collection_panel = CollectionPanel.new()
+	_collection_panel.back_pressed.connect(func(): _show("main"))
+	root.add_child(_collection_panel)
+	return root
+
+
+func _build_account(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	_account_panel = AccountPanel.new()
+	_account_panel.back_pressed.connect(func(): _show("main"))
+	_account_panel.achievements_pressed.connect(func():
+		_ach_back = "account"
+		_show("achievements"))
+	root.add_child(_account_panel)
+	# The first account was just made: carry on to the menu.
+	_account_panel.welcomed.connect(func(): _show("main"))
 	return root
 
 
@@ -751,7 +904,12 @@ func _on_custom_file(path: String) -> void:
 func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: String, on_next: Callable) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
-	var p := {"items": Economy.catalog("character" if kind == "character" else "slipper"), "index": 0, "confirm": false}
+	var items: Array = Economy.catalog("character" if kind == "character" else "slipper").duplicate()
+	if kind == "character":
+		# Browse left to right across the lobby, the way the camera sees it.
+		items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return _lobby_x(a.id) < _lobby_x(b.id))
+	var p := {"items": items, "index": 0, "confirm": false}
 	if kind != "character":
 		_slipper_icon = TextureRect.new()
 		_slipper_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -785,6 +943,24 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 	p.desc.custom_minimum_size = Vector2(560, 0)
 	p.desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(p.desc)
+	if kind != "character":
+		# Wind resistance: five pips and a number (or "Immune").
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		v.add_child(row)
+		var cap := UiKit.title("Wind resistance", 32, Color.WHITE, 6)
+		cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(cap)
+		p.pips = []
+		for i in 5:
+			var pip := ColorRect.new()
+			pip.custom_minimum_size = Vector2(30, 22)
+			pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(pip)
+			p.pips.append(pip)
+		p.wind = UiKit.title("", 32, UiKit.ACCENT, 6)
+		p.wind.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(p.wind)
 	p.status = UiKit.title("", 40, Color.WHITE, 8)
 	v.add_child(p.status)
 	p.buy = UiKit.button("Buy", UiKit.GOLD, 40, Vector2(400, 100))
@@ -801,6 +977,8 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 	right.position = Vector2(1740, 480)
 	right.pressed.connect(_browse.bind(kind, 1))
 	root.add_child(right)
+	p.left = left
+	p.right = right
 
 	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.position = Vector2(80, 940)
@@ -828,7 +1006,16 @@ func _open_picker(kind: String) -> void:
 
 func _browse(kind: String, step: int) -> void:
 	var p: Dictionary = _pickers[kind]
-	p.index = wrapi(p.index + step, 0, p.items.size())
+	if kind == "character":
+		# The lobby is laid out left to right: > always pans right, < left,
+		# stopping at either end (no jumping back across the court).
+		var to := clampi(p.index + step, 0, p.items.size() - 1)
+		if to == p.index:
+			UiFx.bounce(p.left if step < 0 else p.right, 0.9)
+			return
+		p.index = to
+	else:
+		p.index = wrapi(p.index + step, 0, p.items.size())
 	p.confirm = false
 	_refresh_picker(kind)
 	UiFx.bounce(p.name, 1.12)
@@ -841,24 +1028,43 @@ func _refresh_picker(kind: String) -> void:
 	var item: Dictionary = p.items[p.index]
 	var owned := Economy.owns(item.id)
 	p.name.text = item.name
-	p.desc.text = item.desc
+	# A character's story is a reward: it only shows once they're yours.
+	if kind == "character" and not owned:
+		p.desc.text = "Locked. Buy %s to read their story." % item.name
+		p.desc.modulate = Color(1, 1, 1, 0.55)
+	else:
+		p.desc.text = item.desc
+		p.desc.modulate = Color.WHITE
+	if p.has("pips"):
+		var resist := float(item.get("wind_resist", 0.0))
+		var filled := roundi(resist * 5.0)
+		for i in p.pips.size():
+			(p.pips[i] as ColorRect).color = UiKit.ACCENT if i < filled else Color(1, 1, 1, 0.18)
+		p.wind.text = "Immune" if resist >= 1.0 else "%d%%" % roundi(resist * 100.0)
 	p.caps.text = "Tansan: %d" % Economy.caps
 	if owned:
 		p.status.text = "Equipped" if Economy.equipped(_slot(kind)) == item.id else "Owned"
 	else:
 		p.status.text = "Locked  %d tansan" % item.price
+	var ready := Economy.requirement_met(item.id)
 	p.buy.visible = not owned
-	p.buy.disabled = not Economy.can_afford(item.price)
+	p.buy.disabled = not ready or not Economy.can_afford(item.price)
 	p.buy.text = ("Confirm  -%d" % item.price) if p.confirm else ("Buy  %d" % item.price)
-	if p.buy.disabled:
+	if not ready:
+		p.buy.text = Economy.requirement_text(item.id)
+	elif p.buy.disabled:
 		p.buy.text = "Need %d more" % (item.price - Economy.caps)
 	p.next.disabled = not owned
+	if kind == "character":
+		(p.left as Button).modulate.a = 0.35 if p.index == 0 else 1.0
+		(p.right as Button).modulate.a = 0.35 if p.index == p.items.size() - 1 else 1.0
 
-	# Show it on the court; locked items are shown as a dark silhouette.
+	# Characters: the camera goes to them in the lobby. Slippers: locked ones
+	# are shown as a dark silhouette.
 	var tint := Color.WHITE if owned else Color(0.25, 0.25, 0.3)
 	if kind == "character":
+		_tint_lobby()
 		_set_char_preview(item)
-		_char_sprite.modulate = tint
 	else:
 		_set_slipper_preview(item)
 		_slipper_icon.modulate = tint

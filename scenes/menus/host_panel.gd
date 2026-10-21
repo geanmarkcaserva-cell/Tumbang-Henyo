@@ -15,6 +15,10 @@ var _start: Button
 var _end: Button
 var _close: Button
 var _board: ClassBoard
+var _how: Label
+var _question_view: ClassQuestionView
+var _fill: Control
+var _lobby_only: Array = [] ## hidden during a game to make room for the question
 var _close_armed := false
 var _played := false ## at least one game finished in this lobby
 var _t := 0.0
@@ -44,19 +48,26 @@ func _ready() -> void:
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 10)
 	v.add_child(gap)
-	v.add_child(UiKit.title("Lobby ID", 32, Color(1, 1, 1, 0.6), 6))
+	var id_caption := UiKit.title("Lobby ID", 32, Color(1, 1, 1, 0.6), 6)
+	v.add_child(id_caption)
+	_lobby_only = [gap, id_caption]
 	_id_label = UiKit.title("---", 150, UiKit.ACCENT, 22)
 	_id_label.pivot_offset = Vector2(300, 80)
 	v.add_child(_id_label)
-	var how := UiKit.label("Students: tap MULTIPLAYER on the main menu and type this ID. They need to be on the same WiFi as this device.", 30, Color(1, 1, 1, 0.85), 0)
-	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	how.custom_minimum_size = Vector2(700, 0)
-	v.add_child(how)
+	_how = UiKit.label("Students: tap MULTIPLAYER on the main menu and type this ID. They need to be on the same WiFi as this device.", 30, Color(1, 1, 1, 0.85), 0)
+	_how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_how.custom_minimum_size = Vector2(700, 0)
+	v.add_child(_how)
 	_count_label = UiKit.title("", 44, Color.WHITE, 8)
 	v.add_child(_count_label)
-	var fill := Control.new()
-	fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(fill)
+	# During a game: what the students are answering right now.
+	_question_view = ClassQuestionView.new()
+	_question_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_question_view.visible = false
+	v.add_child(_question_view)
+	_fill = Control.new()
+	_fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_fill)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
 	v.add_child(row)
@@ -136,6 +147,15 @@ func _refresh() -> void:
 	_count_label.text = "%d student%s in" % [n, "" if n == 1 else "s"]
 	_start.visible = not Lobby.match_on
 	_end.visible = Lobby.match_on
+	# In a game the ID shrinks (late joiners can still read it) and the
+	# question the class is on takes the space.
+	_how.visible = not Lobby.match_on
+	_question_view.visible = Lobby.match_on
+	_id_label.add_theme_font_size_override("font_size", 64 if Lobby.match_on else 150)
+	_fill.visible = not Lobby.match_on
+	_count_label.visible = not Lobby.match_on
+	for c in _lobby_only:
+		(c as Control).visible = not Lobby.match_on
 	_start.disabled = n == 0
 	_start.text = "New game" if _played else "Start!"
 	_board.show_scores = Lobby.match_on or _played

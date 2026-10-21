@@ -283,6 +283,7 @@ func _open_detail(kind: String, it: Dictionary, mine: bool) -> void:
 	card.add_theme_stylebox_override("panel", solid)
 	card.position = Vector2(260, 200)
 	card.custom_minimum_size = Vector2(1400, 680)
+	card.size = Vector2(1400, 680) # long stories scroll instead of growing the card
 	_detail.add_child(card)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 40)
@@ -306,15 +307,33 @@ func _open_detail(kind: String, it: Dictionary, mine: bool) -> void:
 	var name_l := UiKit.title(it.name if mine else "???", 72, Color.WHITE, 14)
 	v.add_child(name_l)
 	v.add_child(UiKit.accent_rule())
-	var desc := UiKit.label(_detail_text(kind, it, mine), 34, Color(1, 1, 1, 0.9 if mine else 0.6))
+	var story := CharacterStories.of(it.id) if kind == "character" and mine else ""
+	var desc := UiKit.label(_detail_text(kind, it, mine), 30 if story != "" else 34, Color(1, 1, 1, 0.9 if mine else 0.6))
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(700, 0)
 	v.add_child(desc)
 	for line in _detail_facts(kind, it, mine):
 		v.add_child(UiKit.title(line, 34, UiKit.ACCENT if mine else Color(1, 1, 1, 0.55), 6))
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(spacer)
+	if story != "":
+		# Their story: scrolls inside the card (the card keeps its size).
+		var head := UiKit.label("Their story", 26, UiKit.ACCENT, 0)
+		head.add_theme_font_override("font", UiKit.key_font())
+		v.add_child(head)
+		var scroll := ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.custom_minimum_size = Vector2(700, 250)
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		v.add_child(scroll)
+		var body := UiKit.label(story, 27, Color(1, 1, 1, 0.82), 0)
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.custom_minimum_size = Vector2(680, 0)
+		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		body.add_theme_constant_override("line_spacing", 6)
+		scroll.add_child(body)
+	else:
+		var spacer := Control.new()
+		spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		v.add_child(spacer)
 	var close := UiKit.button("Close", UiKit.BLUE, 40, Vector2(240, 100))
 	close.size_flags_horizontal = Control.SIZE_SHRINK_END
 	close.pressed.connect(_close_detail)

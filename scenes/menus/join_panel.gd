@@ -1,17 +1,16 @@
 class_name JoinPanel
 extends Control
-## Main menu -> Multiplayer. A student types their name and the lobby ID
-## their teacher shows, joins, and waits in a small waiting room (who else
-## is in) until the teacher presses Start. Coming back from a class game it
-## shows the live standings.
+## Main menu -> Multiplayer. A student types the lobby ID their teacher shows
+## (they join under their account's name), and waits in a small waiting room
+## (who else is in) until the teacher presses Start. Coming back from a class
+## game it shows the live standings.
 
 signal back_pressed
 
-const SAVE_PATH := "user://lobby.cfg"
 
 var _form: VBoxContainer
 var _wait: VBoxContainer
-var _name: LineEdit
+var _name: Label
 var _code: LineEdit
 var _status: Label
 var _join: Button
@@ -41,10 +40,10 @@ func _ready() -> void:
 	_form.add_child(UiKit.label("Join your teacher's class game.", 32, Color(1, 1, 1, 0.75), 0))
 	_form.add_child(UiKit.accent_rule())
 	_form.add_child(_gap(8))
-	_form.add_child(UiKit.title("Your name", 34, Color(1, 1, 1, 0.7), 6))
-	_name = _field("e.g. Juan D.", 40, false)
-	_name.max_length = 18
+	_form.add_child(UiKit.title("Playing as", 34, Color(1, 1, 1, 0.7), 6))
+	_name = UiKit.title("", 52, UiKit.ACCENT, 8)
 	_form.add_child(_name)
+	_form.add_child(UiKit.label("Your account's name. Your teacher sees it on the class board.", 26, Color(1, 1, 1, 0.55), 0))
 	_form.add_child(_gap(4))
 	_form.add_child(UiKit.title("Lobby ID", 34, Color(1, 1, 1, 0.7), 6))
 	_code = _field("K7P-2QX", 72, true)
@@ -117,11 +116,9 @@ func on_show() -> void:
 	if Lobby.is_client() and Lobby.quiz_title != "":
 		_show_wait()
 	else:
+		_load_name() # the account may have changed since last time
 		_show_form("")
-		if _name.text != "":
-			_code.grab_focus.call_deferred()
-		else:
-			_name.grab_focus.call_deferred()
+		_code.grab_focus.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -141,16 +138,11 @@ func _on_code_changed(t: String) -> void:
 
 
 func _on_join() -> void:
-	if _name.text.strip_edges() == "":
-		_set_status("Type your name first, so your teacher knows who you are.", Color(1.0, 0.75, 0.4))
-		_name.grab_focus()
-		return
 	if Lobby.normalize_id(_code.text).length() != 6:
 		_set_status("A lobby ID has 6 letters and numbers, like K7P-2QX.", Color(1.0, 0.75, 0.4))
 		_code.grab_focus()
 		return
-	_save_name()
-	GameManager.player_name = _name.text.strip_edges()
+	_load_name()
 	_join.disabled = true
 	_join.text = "Looking..."
 	_set_status("Looking for lobby %s on this WiFi..." % _code.text, Color(1, 1, 1, 0.8))
@@ -242,14 +234,5 @@ func _gap(h: float) -> Control:
 
 
 func _load_name() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) == OK:
-		_name.text = cfg.get_value("lobby", "name", "")
-	if _name.text == "" and Accounts.has_any():
-		_name.text = Accounts.current_name() # start from the account's name
-
-
-func _save_name() -> void:
-	var cfg := ConfigFile.new()
-	cfg.set_value("lobby", "name", _name.text.strip_edges())
-	cfg.save(SAVE_PATH)
+	var n := Accounts.current_name() if Accounts.has_any() else ""
+	_name.text = n if n != "" else "Student"

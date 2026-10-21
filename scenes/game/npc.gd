@@ -67,10 +67,6 @@ static func spawn_all(parent: Node3D, barangay: Node, keep_clear: Array = []) ->
 	var houses: Array = barangay.house_boxes() if barangay and barangay.has_method("house_boxes") else []
 	var space := parent.get_world_3d().direct_space_state
 	var paths := sheets()
-	# The team that made the game walks around too (no name tags out here;
-	# those are only on the Credits screen).
-	for m in Team.present():
-		paths.append(Team.sheet(m))
 	var order := range(paths.size())
 	order.shuffle()
 	for k in order.size():

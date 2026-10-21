@@ -75,7 +75,7 @@ func _row(place: int, p: Dictionary) -> Control:
 	var dim := bool(p.get("out", false)) or bool(p.get("left", false))
 	var fs := 26 if compact else 38
 	var place_col: Color = MEDALS[place - 1] if place <= 3 and show_scores else Color(1, 1, 1, 0.7)
-	var place_l := UiKit.title(str(place), fs + 4, place_col, 6)
+	var place_l := UiKit.title("-" if p.get("left", false) else str(place), fs + 4, place_col, 6)
 	place_l.custom_minimum_size = Vector2(44 if compact else 64, 0)
 	place_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	place_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER

@@ -415,9 +415,18 @@ func enable_class_board() -> void:
 	_update_class_pill()
 
 
+## Open or close the class standings (the game opens them while you wait for
+## the class's next question).
+func set_class_board_open(on: bool) -> void:
+	if _class_pill == null or not _class_pill.visible:
+		return
+	_class_open = on
+	_set_class_open(on or _tab_held)
+
+
 func _update_class_pill() -> void:
 	var rank := Lobby.my_rank()
-	var total := Lobby.players.size()
+	var total := Lobby.class_size()
 	_class_label.text = "Class  #%d / %d" % [rank, total] if rank > 0 else "Class"
 
 
@@ -922,7 +931,7 @@ func _build_class_board() -> void:
 	_class_board.max_rows = 8
 	_class_board.custom_minimum_size = Vector2(580, 0)
 	v.add_child(_class_board)
-	var how_to := UiKit.label("Hold Tab anytime to see this (or click the pill)" if not Settings.touch_controls else "Tap the pill to close", 20, Color(1, 1, 1, 0.5), 0)
+	var how_to := UiKit.label("Shows while you wait for the next question. Hold Tab to see it anytime." if not Settings.touch_controls else "Shows while you wait for the next question. Tap the pill anytime.", 20, Color(1, 1, 1, 0.5), 0)
 	v.add_child(how_to)
 	_class_drop.visible = false
 	add_child(_class_drop)

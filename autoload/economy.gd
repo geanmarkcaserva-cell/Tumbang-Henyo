@@ -23,7 +23,7 @@ const CHARACTERS := [
 		"palette": {"hair": Color(0.12, 0.09, 0.08), "skin": Color(0.98, 0.78, 0.72), "shirt": Color(0.2, 0.18, 0.16),
 			"accent": Color(0.92, 0.92, 0.95), "pants": Color(0.2, 0.18, 0.16), "feet": Color(0.15, 0.15, 0.2)},
 		"sprite": {"dir": "res://art/characters/Proktoy", "idle": "Proktoy idle.png", "run": "Proktoy back.png", "happy": "Proktoy happy.png"}},
-	{"id": "gm", "name": "GM", "price": 1000,
+	{"id": "gm", "name": "GM", "price": 1000, "requires": "beat_tanods",
 		"desc": "The neighborhood's resident genius, never without an answer (or that one stubborn strand of hair). Wherever he goes, Ashiela, his other half, is never far behind.",
 		"palette": {"hair": Color(0.05, 0.05, 0.06), "skin": Color(0.98, 0.84, 0.72), "shirt": Color(0.08, 0.1, 0.2),
 			"accent": Color(0.85, 0.15, 0.15), "pants": Color(0.08, 0.1, 0.2), "feet": Color(0.05, 0.05, 0.08)},

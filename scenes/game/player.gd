@@ -108,13 +108,19 @@ func respawn(at: Vector3) -> void:
 
 
 ## Over-the-shoulder aim camera for the throw (closer and more to the right).
+const AIM_CAM_LENGTH := 3.3 ## metres behind while throwing (was 2.4)
+const AIM_CAM_RISE := 0.45 ## metres higher while throwing
+
 func set_aim_mode(on: bool) -> void:
 	$PaperDoll.set_see_through(on) # big-haired characters would block the aim
 	if _camera_tween:
 		_camera_tween.kill()
 	_camera_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
-	_camera_tween.tween_property(_spring, "spring_length", 2.4 if on else 4.0, 0.35)
+	# Throwing: a little further back and a little higher than over-the-shoulder,
+	# so you see more of the court over the character's head.
+	_camera_tween.tween_property(_spring, "spring_length", AIM_CAM_LENGTH if on else 4.0, 0.35)
 	_camera_tween.tween_property(_spring, "position:x", 0.8 if on else 0.5, 0.35)
+	_camera_tween.tween_property(_spring, "position:y", AIM_CAM_RISE if on else 0.0, 0.35)
 
 
 ## Keep the player inside an area on the ground. rect.position is (min x, min z),

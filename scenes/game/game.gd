@@ -127,6 +127,10 @@ var _mama_hit_round := false ## a hanger or walis hit you in Mama's round
 
 var _mama_on := false ## Mama's round is running
 var _mama: CharacterBody3D
+## Class game: waiting at the throw line for the class's next question.
+var _class_waiting := false
+var _class_q := -1 ## the class question being answered (-1: none)
+var _choice_order := [0, 1, 2] ## shown position -> original choice
 var _beacon: Node3D
 var _goal: Dictionary = {} ## the house to reach (from Barangay.house_boxes())
 var _mama_left := 0.0
@@ -190,7 +194,7 @@ func _ready() -> void:
 	_leaves.name = "WindLeaves"
 	_leaves.follow = _player
 	add_child(_leaves)
-	if not Economy.tutorial_done and PLAYTEST_START_ROUND <= 1:
+	if not Economy.tutorial_done and PLAYTEST_START_ROUND <= 1 and not Lobby.in_match():
 		_tut = Tutorial.new()
 		_tut.name = "Tutorial"
 		add_child(_tut)
@@ -205,6 +209,8 @@ func _ready() -> void:
 		_hud.enable_class_board()
 		Lobby.match_ended.connect(_on_class_ended)
 		Lobby.left.connect(_on_class_left)
+		Lobby.question_released.connect(_on_class_question)
+		Lobby.wait_changed.connect(_show_class_wait)
 	_hud.set_awra(awra, MAX_AWRA)
 	_hud.set_round(round_number)
 	_hud.set_score(score)
@@ -343,14 +349,36 @@ func _process(delta: float) -> void:
 
 # --- Class game (multiplayer) ---------------------------------------------------------
 
-## Tell the teacher's lobby how this run is going. The live score counts the
-## points earned so far this round (banked on round clear) so the board moves
-## as students answer and hit. Lobby only sends when something changed.
+## Tell the teacher's lobby how this run is going: the score on your HUD (it
+## banks at each round clear), your round and Aura. Lobby only sends changes.
 func _report_class() -> void:
-	var live := score + int(round(_round_points * (1.0 + 0.1 * (round_number - 1))))
-	if state == State.ROUND_CLEAR or state == State.GAME_OVER:
-		live = score
-	Lobby.report(live, round_number, awra, state == State.GAME_OVER, perfect_shots)
+	# The same score the HUD shows, so the board and your own screen agree.
+	Lobby.report(score, round_number, awra, state == State.GAME_OVER, perfect_shots)
+
+
+## The class's question arrived: ask it (same choice order as everyone else's
+## screen and the teacher's), with however much time is left on it.
+func _on_class_question(index: int, seconds: float) -> void:
+	if state != State.QUIZ or not _class_waiting:
+		return
+	var q := Lobby.class_question(index)
+	if q.is_empty():
+		return
+	_class_waiting = false
+	_class_q = index
+	_question = q
+	_hud.show_status("")
+	_hud.set_class_board_open(false)
+	_ask_question(Lobby.choice_order(index), maxf(Lobby.question_seconds_left(), 1.0))
+
+
+func _show_class_wait() -> void:
+	if not _class_waiting or state != State.QUIZ:
+		return
+	if Lobby.wait_total > 1:
+		_hud.show_status("Waiting for the class...  %d / %d ready" % [Lobby.wait_ready, Lobby.wait_total])
+	else:
+		_hud.show_status("Waiting for the next question...")
 
 
 ## The teacher ended the class game: this run is over.
@@ -523,6 +551,15 @@ func _enter_quiz() -> void:
 	_hud.set_context("quiz")
 	_leaves.set_active(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if Lobby.in_match():
+		# Class game: everyone answers the same question at the same time.
+		# Wait here until the teacher's device sends it.
+		_class_waiting = true
+		_class_q = -1
+		_show_class_wait()
+		_hud.set_class_board_open(true) # standings while you wait
+		Lobby.ready_for_question()
+		return
 	_question = QuizDatabase.next_question(theme_id, QuizDatabase.tier_for_round(round_number))
 	if _question.is_empty():
 		push_error("No questions found for theme '%s'" % theme_id)
@@ -530,11 +567,16 @@ func _enter_quiz() -> void:
 	# Shuffle the choices so players learn answers, not letter positions.
 	var order := [0, 1, 2]
 	order.shuffle()
+	_ask_question(order, _tut.quiz_time_limit() if _tutorial_on() else QUIZ_TIME)
+
+
+func _ask_question(order: Array, seconds: float) -> void:
+	_choice_order = order
 	var choices := []
 	for i in order:
 		choices.append(_question.choices[i])
 	_correct_index = order.find(_question.answer)
-	_quiz.time_limit = _tut.quiz_time_limit() if _tutorial_on() else QUIZ_TIME
+	_quiz.time_limit = seconds
 	_quiz.ask(_question.question, choices)
 	# Hints cost real tansan; none in the free practice round.
 	_quiz.set_hint(not _tutorial_on(), HINT_COST, Economy.caps >= HINT_COST)
@@ -545,6 +587,9 @@ func _enter_quiz() -> void:
 func _on_quiz_answered(choice_index: int) -> void:
 	if state != State.QUIZ:
 		return
+	if _class_q >= 0:
+		Lobby.send_answer(_class_q, _choice_order[choice_index], choice_index == _correct_index)
+		_class_q = -1
 	_quiz.show_result(choice_index, _correct_index, _question.explanation)
 	if _tutorial_on():
 		_tut.on_answer(choice_index == _correct_index)
@@ -589,6 +634,9 @@ func _on_hint_requested() -> void:
 func _on_quiz_timed_out() -> void:
 	if state != State.QUIZ:
 		return
+	if _class_q >= 0:
+		Lobby.send_answer(_class_q, -1, false)
+		_class_q = -1
 	_quiz.show_result(-1, _correct_index, _question.explanation)
 	if _tutorial_on():
 		_tut.on_answer(false)
@@ -1001,8 +1049,8 @@ func _game_over(won: bool = false) -> void:
 	if Lobby.is_client():
 		_report_class() # final score, marked out
 		await get_tree().create_timer(0.6).timeout # let the board catch up
-		_hud.set_class_result(Lobby.my_rank(), Lobby.players.size())
-		if Lobby.my_rank() == 1 and Lobby.players.size() >= 2:
+		_hud.set_class_result(Lobby.my_rank(), Lobby.class_size())
+		if Lobby.my_rank() == 1 and Lobby.class_size() >= 2:
 			Achievements.unlock("class_champ")
 
 

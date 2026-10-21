@@ -960,9 +960,23 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 	title.position = Vector2(90, 50)
 	root.add_child(title)
 
+	# Your bottlecaps, top right: the bottlecap icon and the count.
+	var wallet := HBoxContainer.new()
+	wallet.add_theme_constant_override("separation", 12)
+	wallet.position = Vector2(1330, 52)
+	wallet.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(wallet)
+	var cap_icon := TextureRect.new()
+	cap_icon.texture = preload("res://art/ui/hud/icon_tansan.webp")
+	cap_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cap_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cap_icon.custom_minimum_size = Vector2(72, 72)
+	cap_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	cap_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wallet.add_child(cap_icon)
 	p.caps = UiKit.title("", 46, Color.WHITE, 10)
-	p.caps.position = Vector2(1440, 60)
-	root.add_child(p.caps)
+	p.caps.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	wallet.add_child(p.caps)
 
 	var panel := PanelContainer.new()
 	panel.position = Vector2(80, 210)
@@ -1078,11 +1092,11 @@ func _refresh_picker(kind: String) -> void:
 		for i in p.pips.size():
 			(p.pips[i] as ColorRect).color = UiKit.ACCENT if i < filled else Color(1, 1, 1, 0.18)
 		p.wind.text = "Immune" if resist >= 1.0 else "%d%%" % roundi(resist * 100.0)
-	p.caps.text = "Caps: %d" % Economy.caps
+	p.caps.text = "Bottlecaps: %d" % Economy.caps
 	if owned:
 		p.status.text = "Equipped" if Economy.equipped(_slot(kind)) == item.id else "Owned"
 	else:
-		p.status.text = "Locked  %d caps" % item.price
+		p.status.text = "Locked  %d bottlecaps" % item.price
 	var ready := Economy.requirement_met(item.id)
 	p.buy.visible = not owned
 	p.buy.disabled = not ready or not Economy.can_afford(item.price)

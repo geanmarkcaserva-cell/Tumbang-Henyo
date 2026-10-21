@@ -315,7 +315,7 @@ func _show_details() -> void:
 	if int(s.best) > 0:
 		best = "%d  (%s)" % [s.best, GameManager.theme_name(s.best_theme)]
 	var tiles := [
-		["Tansan", str(s.caps)],
+		["Caps", str(s.caps)],
 		["Trophies", "%d / %d" % [s.achievements, Achievements.LIST.size()]],
 		["Games played", str(s.games)],
 		["Made it home", str(s.wins)],
@@ -396,13 +396,13 @@ func _open_editor(mode: String) -> void:
 	match mode:
 		"welcome":
 			_ed_title.text = "Welcome!"
-			_ed_hint.text = "Make an account to keep your tansan, items, scores and trophies. " \
+			_ed_hint.text = "Make an account to keep your caps, items, scores and trophies. " \
 					+ "Up to %d players can have their own on this device." % Accounts.MAX_ACCOUNTS
 			_ed_field.text = ""
 			_ed_ok.text = "Let's go!"
 		"create":
 			_ed_title.text = "New account"
-			_ed_hint.text = "A fresh start: its own tansan, items, scores and trophies."
+			_ed_hint.text = "A fresh start: its own caps, items, scores and trophies."
 			_ed_field.text = ""
 			_ed_ok.text = "Create"
 		"rename":
@@ -554,7 +554,7 @@ func _fill_picker() -> void:
 	var slips := []
 	for it in Economy.SLIPPERS:
 		slips.append({"kind": "slipper", "id": it.id, "free": it.price == 0})
-	_pic_section("Tsinelas", slips, a, current_av, func(av): return av.free or owned.has(av.id))
+	_pic_section("Slippers", slips, a, current_av, func(av): return av.free or owned.has(av.id))
 	var eggs := []
 	for it in EasterEggs.ITEMS:
 		eggs.append({"kind": "item", "id": it.id})

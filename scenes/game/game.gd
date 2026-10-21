@@ -196,7 +196,7 @@ func _ready() -> void:
 		add_child(_tut)
 		_tut.setup(_hud, _player, _finish)
 
-	QuizDatabase.reset_run()
+	QuizDatabase.reset_run(Lobby.in_match())
 	Achievements.add_stat("runs")
 	if Lobby.in_match():
 		# Class game: same seed for everyone, so the questions (and the wind)
@@ -523,7 +523,7 @@ func _enter_quiz() -> void:
 	_hud.set_context("quiz")
 	_leaves.set_active(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	_question = QuizDatabase.next_question(theme_id, "easy")
+	_question = QuizDatabase.next_question(theme_id, QuizDatabase.tier_for_round(round_number))
 	if _question.is_empty():
 		push_error("No questions found for theme '%s'" % theme_id)
 		return
@@ -583,7 +583,7 @@ func _on_hint_requested() -> void:
 	var wrong := [0, 1, 2].filter(func(i): return i != _correct_index)
 	_quiz.eliminate(wrong.pick_random())
 	Sfx.play("hint")
-	_hud.show_status("Hint: one wrong answer crossed out.  -%d tansan" % HINT_COST)
+	_hud.show_status("Hint: one wrong answer crossed out.  -%d caps" % HINT_COST)
 
 
 func _on_quiz_timed_out() -> void:
@@ -632,7 +632,7 @@ func _enter_throw() -> void:
 		_hud.show_status("")
 		_tut.on_throw_begin()
 	else:
-		_hud.show_status("Tama! Knock down the lata!")
+		_hud.show_status("Correct! Knock down the can!")
 		if _wind.length() > 0.05 and Economy.first_time("wind"):
 			_hud.show_tip("Wind!", "The leaves show where it blows. Aim a little into it.", 6.0)
 	_throw.begin(_player, _wind, _preview_for_round())
@@ -691,7 +691,7 @@ func _on_throw_missed() -> void:
 	if state == State.GAME_OVER:
 		return
 	Sfx.play("miss")
-	_hud.show_status("Sablay! Missed the lata.")
+	_hud.show_status("Missed the can!")
 	_player.controls_enabled = false
 	if practice:
 		_tut.on_miss()
@@ -707,6 +707,7 @@ func _on_lata_knocked_down() -> void:
 	if state == State.THROW:
 		_round_points += POINTS_HIT
 		Sfx.play("voice_tumba") # recorded shout, once the file exists
+		Music.play("running", 0.35) # the running song kicks in on a hit (loops)
 		_advance_clock(CLOCK_HIT_STEP)
 		Achievements.unlock("tumba")
 		if _wind.length() >= 4.0:
@@ -737,7 +738,7 @@ func _enter_run() -> void:
 	else:
 		Sfx.play("voice_takbo")
 		var who := "the taya" if _tayas.size() == 1 else "a taya"
-		_hud.show_status("Tumba! Run before %s stands the lata back up!" % who)
+		_hud.show_status("Down! Run before %s stands the can back up!" % who)
 		if not _item.is_empty() and is_instance_valid(_item_pickup) and EasterEggs.SHOW_MARKERS:
 			_hud.set_beacon(_item_spot, _player, Color(1.0, 0.82, 0.3))
 	var speed_ratio := TUTORIAL_TAYA_SPEED_RATIO if practice else TAYA_SPEED_RATIO
@@ -763,7 +764,7 @@ func _on_taya_lata_reset() -> void:
 	if _tutorial_on():
 		_tut.on_lata_up()
 	else:
-		_hud.show_status("Lata is up! Takbo!")
+		_hud.show_status("The can is up! Run!")
 
 
 func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
@@ -780,7 +781,7 @@ func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
 	var away := _player.global_position - from_taya.global_position
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
-	_hud.show_status("Aray!" if practice else "Aray! -%d Awra" % AWRA_SLIPPER_HIT)
+	_hud.show_status("Ouch!" if practice else "Ouch! -%d Aura" % AWRA_SLIPPER_HIT)
 
 
 func _on_tagged() -> void:
@@ -798,10 +799,10 @@ func _on_tagged() -> void:
 	if state == State.GAME_OVER:
 		return
 	if practice:
-		_hud.show_status("Huli ka!")
+		_hud.show_status("Tagged!")
 		_tut.on_tagged()
 	else:
-		_hud.show_status("Huli ka! -%d Awra" % AWRA_TAGGED)
+		_hud.show_status("Tagged! -%d Aura" % AWRA_TAGGED)
 	await _wait(2.4 if practice else 1.8)
 	if state == State.TAGGED:
 		if practice:
@@ -840,7 +841,7 @@ func _round_clear() -> void:
 	_hud.set_score(score)
 	_add_caps(CAPS_ROUND_CLEAR)
 	Economy.save_profile()
-	_hud.show_status("Round %d clear!  +%d points  +%d Awra  +%d tansan" % [round_number, gained, AWRA_ROUND_CLEAR, CAPS_ROUND_CLEAR])
+	_hud.show_status("Round %d clear!  +%d points  +%d Aura  +%d caps" % [round_number, gained, AWRA_ROUND_CLEAR, CAPS_ROUND_CLEAR])
 	await _wait(2.2)
 	if state != State.ROUND_CLEAR:
 		return
@@ -877,11 +878,11 @@ func _round_clear() -> void:
 	_enter_quiz()
 	if joined > 0:
 		var elite_joined: bool = _tayas.back().elite
-		_hud.show_status("Round %d: %s" % [round_number, "an ELITE taya joins! (3 tsinelas)" if elite_joined else "another taya joins!"])
+		_hud.show_status("Round %d: %s" % [round_number, "an ELITE taya joins! (3 slippers)" if elite_joined else "another taya joins!"])
 		if elite_joined and Economy.first_time("elite"):
-			_hud.show_tip("Elite taya", "Elites throw tsinelas at you. Jump to dodge.", 6.0)
+			_hud.show_tip("Elite taya", "Elites throw slippers at you. Jump to dodge.", 6.0)
 		elif not elite_joined and Economy.first_time("squad"):
-			_hud.show_tip("Two tayas", "One resets the lata, one chases you. Sprint early!", 6.0)
+			_hud.show_tip("Two tayas", "One resets the can, one chases you. Sprint early!", 6.0)
 	await _wait(0.15) # one beat of black so the jump isn't visible
 	_hud.fade_in(FADE_TIME)
 
@@ -1052,7 +1053,7 @@ func _begin_mama_round() -> void:
 	if not _mama_on or state == State.GAME_OVER:
 		return
 	if Economy.first_time("mama"):
-		_hud.show_tip("Mama's round", "Hit the lata, then run to the house with the light in 30 seconds. Mama is faster than you: cut around houses to lose her!", 9.0)
+		_hud.show_tip("Mama's round", "Hit the can, then run to the house with the light in 30 seconds. Mama is faster than you: cut around houses to lose her!", 9.0)
 	_enter_quiz()
 
 
@@ -1119,7 +1120,7 @@ func _enter_mama_run() -> void:
 	_mama_left = MAMA_TIME
 	_hud.show_boss_timer(true)
 	_hud.set_boss_time(_mama_left)
-	_hud.show_status("Takbo! Run home to the light!")
+	_hud.show_status("Run home to the light!")
 	_mama_tick_shown = -1
 	Music.play("mama")
 	_mama.start_chase()
@@ -1182,7 +1183,7 @@ func _victory() -> void:
 	if score >= 15000:
 		Achievements.unlock("legend")
 	Sfx.play("victory")
-	_hud.show_banner("Nakauwi ka na!", "Mama's not angry anymore.  +%d points" % gained, Color(0.55, 0.92, 1.0), 2.6)
+	_hud.show_banner("Home safe!", "Mama's not angry anymore.  +%d points" % gained, Color(0.55, 0.92, 1.0), 2.6)
 	await _wait(3.4)
 	if state != State.ROUND_CLEAR:
 		return
@@ -1191,7 +1192,7 @@ func _victory() -> void:
 		var icons := []
 		for it in EasterEggs.ITEMS:
 			icons.append(EasterEggs.icon(it.id, 6))
-		_hud.ask_choice("Labas ulit?", "Your friends are back outside and want to keep playing until 7:00 PM.\nRounds 16 to 25. Watch out for the tanods at curfew!",
+		_hud.ask_choice("Play some more?", "Your friends are back outside and want to keep playing until 7:00 PM.\nRounds 16 to 25. Watch out for the tanods at curfew!",
 				["Keep playing", "Finish"], icons)
 		var pick: int = await _hud.choice_made
 		if state != State.ROUND_CLEAR:
@@ -1216,20 +1217,43 @@ func _mama_failed(caught: bool) -> void:
 	_hud.show_boss_timer(false)
 	_hud.set_beacon(null)
 	_mama.stop()
-	_player.hurt()
+	if caught:
+		_mama_punch()
+	else:
+		_player.hurt()
 	_lose_awra(AWRA_MAMA_CAUGHT if caught else AWRA_MAMA_LATE)
 	if state == State.GAME_OVER:
 		return
-	Sfx.play("palo" if caught else "timeout")
+	if not caught:
+		Sfx.play("timeout")
 	if caught:
-		Sfx.play("voice_mama_palo")
-		_hud.show_banner("PALO!", "Mama caught you.  -%d Awra" % AWRA_MAMA_CAUGHT, Color(1.0, 0.42, 0.36), 1.4)
+		_hud.show_banner("WHACK!", "Mama caught you.  -%d Aura" % AWRA_MAMA_CAUGHT, Color(1.0, 0.42, 0.36), 1.4)
 	else:
-		_hud.show_banner("Too late!", "Mama's still angry.  -%d Awra" % AWRA_MAMA_LATE, Color(1.0, 0.42, 0.36), 1.4)
+		_hud.show_banner("Too late!", "Mama's still angry.  -%d Aura" % AWRA_MAMA_LATE, Color(1.0, 0.42, 0.36), 1.4)
 	_hud.show_status("")
 	await _wait(2.2)
 	if state == State.TAGGED:
 		_next_attempt()
+
+
+## Mama's catch lands like a punch: hit-stop, a slap, her shout (a girl's or a
+## boy's "Mama!" to match who you play), camera shake, knock-back and a POW!.
+## The Mama voice plays only here, when she catches you.
+const FEMALE_CHARACTERS := ["kei", "saisai", "ashiela", "lisa"]
+
+func _mama_punch() -> void:
+	Sfx.play("palo")
+	Sfx.play("slap", 2.0, 0.8, 0.0)
+	Sfx.play("mama_female" if Economy.equipped_character in FEMALE_CHARACTERS else "mama_male")
+	_hud.punch_fx()
+	_player.shake(0.45, 0.5)
+	var away := _player.global_position - _mama.global_position
+	away.y = 0.0
+	_player.stagger(0.6, away.normalized() * 9.0)
+	# Hit-stop: the world freezes for a beat as the blow lands.
+	Engine.time_scale = 0.05
+	await get_tree().create_timer(0.14, true, false, true).timeout
+	Engine.time_scale = 1.0
 
 
 func _on_mama_hit() -> void:
@@ -1245,7 +1269,7 @@ func _on_mama_hit() -> void:
 	var away := _player.global_position - _mama.global_position
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME, away.normalized() * SLIPPER_KNOCKBACK)
-	_hud.show_status("Aray! -%d Awra" % AWRA_MAMA_HIT)
+	_hud.show_status("Ouch! -%d Aura" % AWRA_MAMA_HIT)
 
 
 # --- Secret rounds 16-25 and the curfew (7:00 PM) -------------------------------------
@@ -1278,7 +1302,7 @@ func _start_secret_rounds() -> void:
 	_enter_quiz()
 	await _wait(0.15)
 	_hud.fade_in(FADE_TIME)
-	_hud.show_banner("Labas ulit!", "Your friends are back to play. Until 7:00 PM!", UiKit.ACCENT, 2.6)
+	_hud.show_banner("Back outside!", "Your friends are back to play. Until 7:00 PM!", UiKit.ACCENT, 2.6)
 
 
 ## Round 25, 7:00 PM: the tanods come out.
@@ -1322,7 +1346,7 @@ func _begin_tanod_round() -> void:
 	if not _tanod_on or state == State.GAME_OVER:
 		return
 	if Economy.first_time("tanod"):
-		_hud.show_tip("Curfew!", "Knock the lata down, then run home to the light in %d seconds. Orange tanods dash along the red strip: get out of it!" % int(TANOD_TIME), 9.0)
+		_hud.show_tip("Curfew!", "Knock the can down, then run home to the light in %d seconds. Orange tanods dash along the red strip: get out of it!" % int(TANOD_TIME), 9.0)
 	_enter_quiz()
 
 
@@ -1339,7 +1363,7 @@ func _enter_tanod_run() -> void:
 	_mama_left = TANOD_TIME
 	_hud.show_boss_timer(true, "Get home!")
 	_hud.set_boss_time(_mama_left)
-	_hud.show_status("Takbo! The tanods are coming!")
+	_hud.show_status("Run! The tanods are coming!")
 	_mama_tick_shown = -1
 	Music.play("mama")
 	Sfx.play("whistle")
@@ -1365,7 +1389,7 @@ func _on_tanod_hit(from: CharacterBody3D) -> void:
 	var away := _player.global_position - from.global_position
 	away.y = 0.0
 	_player.stagger(SLIPPER_STAGGER_TIME * 0.7, away.normalized() * SLIPPER_KNOCKBACK)
-	_hud.show_status("Aray! -%d Awra" % AWRA_TANOD_HIT)
+	_hud.show_status("Ouch! -%d Aura" % AWRA_TANOD_HIT)
 
 
 func _stop_tanods() -> void:
@@ -1388,9 +1412,9 @@ func _tanod_failed(caught: bool) -> void:
 		return
 	Sfx.play("tagged" if caught else "timeout")
 	if caught:
-		_hud.show_banner("HULI KA!", "The tanods caught you.  -%d Awra" % AWRA_TANOD_CAUGHT, Color(1.0, 0.55, 0.25), 1.4)
+		_hud.show_banner("CAUGHT!", "The tanods caught you.  -%d Aura" % AWRA_TANOD_CAUGHT, Color(1.0, 0.55, 0.25), 1.4)
 	else:
-		_hud.show_banner("Too late!", "Past curfew.  -%d Awra" % AWRA_TANOD_LATE, Color(1.0, 0.55, 0.25), 1.4)
+		_hud.show_banner("Too late!", "Past curfew.  -%d Aura" % AWRA_TANOD_LATE, Color(1.0, 0.55, 0.25), 1.4)
 	_hud.show_status("")
 	await _wait(2.2)
 	if state == State.TAGGED:
@@ -1422,7 +1446,7 @@ func _tanod_success() -> void:
 	if score >= 15000:
 		Achievements.unlock("legend")
 	Sfx.play("victory")
-	_hud.show_banner("Ligtas ka!", "Home before curfew.  +%d points" % gained, Color(1.0, 0.82, 0.3), 2.8)
+	_hud.show_banner("Safe!", "Home before curfew.  +%d points" % gained, Color(1.0, 0.82, 0.3), 2.8)
 	await _wait(3.6)
 	if state == State.ROUND_CLEAR:
 		_game_over(true)
@@ -1486,7 +1510,7 @@ func _on_item_collected(item_id: String) -> void:
 	var found := Economy.collection.size()
 	if Economy.has_all_eggs():
 		Achievements.unlock("all_eggs")
-		_hud.show_banner("Kumpleto!", "All 5 found! Stay out past 6:00 PM to see what happens...", Color(1.0, 0.82, 0.3), 3.2)
+		_hud.show_banner("Complete!", "All 5 found! Stay out past 6:00 PM to see what happens...", Color(1.0, 0.82, 0.3), 3.2)
 	elif is_new:
 		_hud.show_banner(it.name + "!", "Hidden item found  (%d / %d)  -  see Collection" % [found, EasterEggs.ITEMS.size()], Color(1.0, 0.82, 0.3), 2.6)
 
@@ -1535,6 +1559,8 @@ func _wait(seconds: float) -> Signal:
 
 func _set_state(new_state: State) -> void:
 	state = new_state
+	if new_state == State.QUIZ or new_state == State.THROW:
+		Music.play("game", 0.8) # back from the running song (no-op if already on it)
 	if new_state != State.THROW:
 		Sfx.fade_loop("wind", -80.0, 0.8) # wind is only heard on the throw line
 		Sfx.stop_loop("charge")

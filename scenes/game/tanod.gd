@@ -47,7 +47,7 @@ const NAVY := {"hair": Color(0.1, 0.13, 0.3), "band": Color(1.0, 0.82, 0.25), "s
 		"shirt": Color(0.12, 0.16, 0.36), "accent": Color(1.0, 0.82, 0.25), "pants": Color(0.08, 0.1, 0.22), "feet": Color(0.05, 0.05, 0.06)}
 const ORANGE := {"hair": Color(0.1, 0.13, 0.3), "band": Color(1.0, 0.82, 0.25), "skin": Color(0.7, 0.5, 0.36),
 		"shirt": Color(1.0, 0.45, 0.08), "accent": Color(0.95, 0.95, 0.85), "pants": Color(0.08, 0.1, 0.22), "feet": Color(0.05, 0.05, 0.06)}
-const SHOUTS := ["CURFEW NA!", "TIGIL!", "HOY BATA!", "UWI NA!", "HULI KA!"]
+const SHOUTS := ["CURFEW!", "STOP!", "HEY, KID!", "GO HOME!", "CAUGHT!"]
 
 var kind: Kind = Kind.THROWER
 var target: CharacterBody3D
@@ -295,7 +295,7 @@ func _start_aim() -> void:
 	_strip.visible = true
 	var mid := global_position + _dash_dir * (DASH_LENGTH * 0.5)
 	_strip.global_transform = Transform3D(Basis.looking_at(_dash_dir, Vector3.UP), Vector3(mid.x, global_position.y + 0.06, mid.z))
-	_say("TIGIL!")
+	_say("STOP!")
 	Sfx.play_at("alert", global_position, 6.0, 0.8)
 
 

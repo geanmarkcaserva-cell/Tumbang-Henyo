@@ -11,11 +11,11 @@ extends Control
 const GAMEPLAY_TIPS := [
 	"Juke the taya: cut hard the other way and it keeps running where it thought you'd go.",
 	"Tayas run faster than you walk but slower than you sprint. Save your Energy for the escape.",
-	"A red ring means a tsinelas is coming fast. Get out of it right away.",
+	"A red ring means a slipper is coming fast. Get out of it right away.",
 	"Jump while running for a burst of speed. Chain jumps to go even faster, if you have the Energy.",
 	"Sidestep a lunge at the last moment and the taya stumbles. That's your chance.",
 	"Answer fast: quicker answers score more points.",
-	"A taya with no tsinelas left has to stop and pick one up.",
+	"A taya with no slippers left has to stop and pick one up.",
 ]
 
 var _time := 0.0

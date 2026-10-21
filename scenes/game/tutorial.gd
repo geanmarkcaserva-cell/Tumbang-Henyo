@@ -68,10 +68,10 @@ func start() -> void:
 		"body": "Three steps, one practice round.",
 		"points": [
 			{"badge": "1", "title": "Answer", "text": "Earn your throw"},
-			{"badge": "2", "title": "Throw", "text": "Knock down the lata"},
+			{"badge": "2", "title": "Throw", "text": "Knock down the can"},
 			{"badge": "3", "title": "Run", "text": "Reach the finish line"},
 		],
-		"note": "Practice round: no Awra lost",
+		"note": "Practice round: no Aura lost",
 		"buttons": [{"id": "go", "text": "Start", "primary": true}, {"id": "skip", "text": "Skip"}],
 	})
 	var choice: String = await _answered
@@ -135,7 +135,7 @@ func on_answer(correct: bool) -> void:
 		if running and step == Step.QUIZ:
 			_hud.coach.hide_card()
 	else:
-		_coach(1, "Not quite!", "Wrong answers cost Awra. Free in practice.", {}, "",
+		_coach(1, "Not quite!", "Wrong answers cost Aura. Free in practice.", {}, "",
 				{"title_color": OOPS})
 		_hud.highlight("awra")
 
@@ -172,7 +172,7 @@ func on_miss() -> void:
 		return
 	_retry = true
 	_go(Step.FLYING)
-	_coach(4, "So close!", "Misses cost Awra. Free in practice.", {}, "", {"title_color": OOPS})
+	_coach(4, "So close!", "Misses cost Aura. Free in practice.", {}, "", {"title_color": OOPS})
 
 
 func on_run() -> void:
@@ -180,7 +180,7 @@ func on_run() -> void:
 		return
 	_go(Step.RUN)
 	_show_marker(true)
-	_coach(5, "Tumba! Run!", "Reach the glowing finish line.",
+	_coach(5, "Down! Run!", "Reach the glowing finish line.",
 			{"keys": [_move_keys(), "Run"]}, "Use the joystick to run to the light.")
 	_hud.highlight("")
 
@@ -198,7 +198,7 @@ func on_tagged() -> void:
 	_show_marker(false)
 	_go(Step.FLYING)
 	_hud.highlight("")
-	_coach(5, "Tagged!", "Tags cost Awra. Back to the line!", {}, "", {"title_color": OOPS})
+	_coach(5, "Tagged!", "Tags cost Aura. Back to the line!", {}, "", {"title_color": OOPS})
 
 
 ## The practice round is cleared. await it: returns when the player is ready.
@@ -213,8 +213,8 @@ func on_round_clear() -> void:
 		"title": "You're ready!",
 		"points_layout": "rows",
 		"points": [
-			{"icon": ICON_AWRA, "text": "Mistakes cost Awra. At zero, it's game over."},
-			{"icon": ICON_TANSAN, "text": "Clear rounds to earn tansan for new looks."},
+			{"icon": ICON_AWRA, "text": "Mistakes cost Aura. At zero, it's game over."},
+			{"icon": ICON_TANSAN, "text": "Clear rounds to earn caps for new looks."},
 			{"icon": ICON_SPRINT, "text": "Later rounds bring wind and more tayas."},
 		],
 		"buttons": [{"id": "done", "text": "Let's play!", "primary": true}],
@@ -268,7 +268,7 @@ func _enter_aim() -> void:
 	_go(Step.AIM)
 	_last_aim = -_player.get_aim_basis().z
 	_aim_turned = 0.0
-	_coach(3, "Aim at the lata", "The circle shows where it lands.",
+	_coach(3, "Aim at the can", "The circle shows where it lands.",
 			{"keys": [["Mouse"], "Aim"]}, "Drag on the right side to aim.")
 	_hud.highlight("")
 

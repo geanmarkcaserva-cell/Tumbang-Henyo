@@ -42,6 +42,9 @@ func _ready() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(1560, 690)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	if _is_mobile():
+		_fat_scrollbar(scroll.get_v_scroll_bar(), 44)
+		scroll.custom_minimum_size.x = 1560 + 56
 	v.add_child(scroll)
 	_grid = GridContainer.new()
 	_grid.columns = 2
@@ -55,6 +58,32 @@ func _ready() -> void:
 	v.add_child(back)
 	Achievements.unlocked.connect(func(_id): refresh())
 	refresh()
+
+
+func _is_mobile() -> bool:
+	return OS.has_feature("mobile") or Settings.touch_controls
+
+
+## Phones: a thumb-sized scroll bar (rounded track and grabber) instead of the
+## hairline default.
+func _fat_scrollbar(bar: VScrollBar, width: int) -> void:
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(1, 1, 1, 0.08)
+	track.set_corner_radius_all(width / 2)
+	track.content_margin_left = width / 2.0
+	track.content_margin_right = width / 2.0
+	bar.add_theme_stylebox_override("scroll", track)
+	bar.add_theme_stylebox_override("scroll_focus", track)
+	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		var g := StyleBoxFlat.new()
+		g.bg_color = UiKit.ACCENT if state != "grabber" else Color(UiKit.ACCENT, 0.75)
+		g.set_corner_radius_all(width / 2)
+		g.content_margin_left = width / 2.0
+		g.content_margin_right = width / 2.0
+		g.content_margin_top = width / 2.0
+		g.content_margin_bottom = width / 2.0
+		bar.add_theme_stylebox_override(state, g)
+	bar.custom_minimum_size.x = width
 
 
 func refresh() -> void:

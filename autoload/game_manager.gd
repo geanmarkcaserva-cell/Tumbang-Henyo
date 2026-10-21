@@ -12,12 +12,17 @@ const THEMES := [
 const BOOT_LOADING := "res://scenes/menus/boot_loading.tscn"
 const MAIN_MENU := "res://scenes/menus/main_menu.tscn"
 const TIPS_LOADING := "res://scenes/menus/tips_loading.tscn"
+const TRAILER := "res://scenes/menus/trailer.tscn" ## plays when the game opens, before the main menu
+const TRAILER_VIDEO := "res://art/video/trailer.ogv"
 const GAME := "res://scenes/game/game.tscn"
 
 const BOARD_PATH := "user://leaderboard.cfg"
 const BOARD_SIZE := 7
 
 var selected_theme := "history"
+## Where the trailer goes when it ends (set by the boot screen: the main menu,
+## already loaded).
+var after_trailer: PackedScene
 ## The name on the device leaderboard: the current account's.
 var player_name: String:
 	get:

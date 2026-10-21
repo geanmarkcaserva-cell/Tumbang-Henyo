@@ -31,7 +31,6 @@ const SHOTS := {
 	"mode": {"pos": Vector3(-8.5, 2.6, -11.0), "look": Vector3(4.0, 2.2, -26.0), "sway": 1.0},
 	"custom": {"pos": Vector3(-9.0, 7.5, -4.0), "look": Vector3(3.0, 0.0, -24.0), "sway": 0.7},
 	"settings": {"pos": Vector3(0.0, 10.0, 6.0), "look": Vector3(0.0, 0.0, -18.0), "sway": 1.0},
-	"credits": {"pos": Vector3(7.0, 2.2, -32.0), "look": Vector3(0.0, 4.5, -43.0), "sway": 1.0},
 	"join": {"pos": Vector3(-6.5, 3.4, 1.0), "look": Vector3(1.5, 1.5, -26.0), "sway": 1.0},
 	"host": {"pos": Vector3(8.5, 2.4, -6.0), "look": Vector3(-3.0, 2.0, -28.0), "sway": 0.8},
 	"achievements": {"pos": Vector3(0.0, 1.6, -34.0), "look": Vector3(0.0, 3.0, -10.0), "sway": 0.8},
@@ -79,6 +78,16 @@ var _join_panel: JoinPanel
 var _account_panel: AccountPanel
 var _ach_panel: AchievementsPanel
 var _collection_panel: CollectionPanel
+var _team := [] ## credits: {member, root, sprite, look, phase} for each team member
+var _credit_i := 0 ## 0 = the whole team, 1.. = one member
+var _credit_auto := 0.0 ## seconds until the next member
+var _credit_card := {}
+const CREDIT_STEP := 6.5 ## seconds on each member before moving on
+## Credits: the whole team, from the street south of them.
+const TEAM_SHOT := {"pos": Vector3(-16.6, 3.0, -28.4), "look": Vector3(-17.9, 0.8, -36.6), "sway": 0.2, "fov": 72.0}
+## Close-up on one member (relative to their spot): straight on, them right of the card.
+const TEAM_CAM := Vector3(0.3, 1.15, 2.8)
+const TEAM_LOOK := Vector3(-0.7, 0.95, 0.0)
 var _ach_back := "main" ## achievements opened from the main menu or from an account card
 var _account_chip: Button
 var _delete_armed := false
@@ -104,6 +113,7 @@ func _ready() -> void:
 	if taya:
 		taya.queue_free()
 	_build_lobby()
+	_build_team()
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	_panels["main"] = _build_main(ui)
@@ -114,7 +124,7 @@ func _ready() -> void:
 	_panels["weapon"] = _build_picker(ui, "weapon", "Select weapon", "Go!",
 			func(): _confirm_pick("weapon", ""))
 	_panels["settings"] = _build_settings(ui)
-	_panels["credits"] = _build_simple(ui, "Credits", "Tumbang Henyo\n\nGame design, art and code by the Tumbang Henyo team.")
+	_panels["credits"] = _build_credits(ui)
 	_panels["join"] = _build_join(ui)
 	_panels["host"] = _build_host(ui)
 	_panels["achievements"] = _build_achievements(ui)
@@ -156,6 +166,13 @@ func _process(delta: float) -> void:
 		var sheet: Dictionary = c.look[c.state]
 		var spr: Sprite3D = c.sprite
 		spr.frame = int((_time - float(c.since)) * sheet.fps) % spr.hframes
+	for t in _team:
+		var ts: Sprite3D = t.sprite
+		ts.frame = int(_time * float(t.look.idle.fps) + float(t.phase)) % ts.hframes
+	if _current == "credits" and _panels["credits"].visible:
+		_credit_auto -= delta
+		if _credit_auto <= 0.0:
+			_credit_go(1)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -169,6 +186,14 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Left/right browse in character and weapon select. Taken here, before the
 ## buttons see them, so the arrow keys don't just move the button focus.
 func _input(event: InputEvent) -> void:
+	if _current == "credits" and _panels["credits"].visible:
+		if event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
+			_credit_go(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_right") or event.is_action_pressed("move_right"):
+			_credit_go(1)
+			get_viewport().set_input_as_handled()
+		return
 	if not _pickers.has(_current) or not _panels[_current].visible:
 		return
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
@@ -202,6 +227,13 @@ func _show(panel_id: String, instant: bool = false) -> void:
 		_account_panel.refresh()
 	elif panel_id == "collection":
 		_collection_panel.refresh()
+	if changed:
+		for t in _team:
+			(t.tag as Node3D).visible = true
+	if panel_id == "credits" and changed:
+		_credit_i = 0
+		_credit_auto = 3.0 # a moment on the whole team, then the first close-up
+		_fill_credit()
 	for key in _panels:
 		_panels[key].visible = key == panel_id
 	if _pickers.has(panel_id):
@@ -226,6 +258,11 @@ func _shot(panel_id: String) -> Dictionary:
 		if panel_id == "character":
 			return {"pos": at + CHAR_CAM, "look": at + CHAR_LOOK, "sway": 0.06, "fov": CHAR_FOV}
 		return {"pos": at + WEAPON_CAM, "look": at + WEAPON_LOOK, "sway": 0.08}
+	if panel_id == "credits":
+		if _credit_i == 0 or _credit_i > _team.size():
+			return TEAM_SHOT
+		var spot: Vector3 = (_team[_credit_i - 1].root as Node3D).position
+		return {"pos": spot + TEAM_CAM, "look": spot + TEAM_LOOK, "sway": 0.06, "fov": CHAR_FOV}
 	return SHOTS[panel_id]
 
 
@@ -1041,11 +1078,11 @@ func _refresh_picker(kind: String) -> void:
 		for i in p.pips.size():
 			(p.pips[i] as ColorRect).color = UiKit.ACCENT if i < filled else Color(1, 1, 1, 0.18)
 		p.wind.text = "Immune" if resist >= 1.0 else "%d%%" % roundi(resist * 100.0)
-	p.caps.text = "Tansan: %d" % Economy.caps
+	p.caps.text = "Caps: %d" % Economy.caps
 	if owned:
 		p.status.text = "Equipped" if Economy.equipped(_slot(kind)) == item.id else "Owned"
 	else:
-		p.status.text = "Locked  %d tansan" % item.price
+		p.status.text = "Locked  %d caps" % item.price
 	var ready := Economy.requirement_met(item.id)
 	p.buy.visible = not owned
 	p.buy.disabled = not ready or not Economy.can_afford(item.price)
@@ -1140,3 +1177,180 @@ func _build_simple(ui: CanvasLayer, heading: String, body: String) -> Control:
 	back.pressed.connect(func(): _show("main"))
 	v.add_child(back)
 	return root
+
+
+# --- Credits: the team -------------------------------------------------------------
+
+## The team stands together west of the court, each with a name tag.
+func _build_team() -> void:
+	for m: Dictionary in Team.present():
+		var root := Node3D.new()
+		root.name = "Team_" + String(m.id)
+		root.position = m.spot
+		add_child(root)
+		var look := PixelArt.single_sheet_look(Team.sheet(m))
+		var px: float = look.pixel_size
+		var spr := _pixel_sprite(px)
+		spr.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		spr.texture = look.idle.texture
+		spr.hframes = maxi(look.idle.frames, 1)
+		spr.position = Vector3(0.0, look.frame_h * px * 0.5 - look.foot_pad * px, 0.0)
+		root.add_child(spr)
+		var shadow := MeshInstance3D.new()
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.45
+		disc.bottom_radius = 0.45
+		disc.height = 0.01
+		shadow.mesh = disc
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(0.1, 0.05, 0.15, 0.3)
+		shadow.material_override = mat
+		shadow.position = Vector3(0.0, 0.04, 0.0)
+		root.add_child(shadow)
+		var tag := NameTag.new()
+		tag.text = m.nick
+		tag.position.y = PixelArt.MAX_HEIGHT + 0.3
+		root.add_child(tag)
+		_team.append({"member": m, "root": root, "sprite": spr, "look": look, "tag": tag, "phase": randf() * 3.0})
+
+
+## Credits screen: a card on the left (minimal, boxed), the camera on the
+## person it's about. Starts on the whole team, then one by one.
+func _build_credits(ui: CanvasLayer) -> Control:
+	var root := UiKit.full_rect()
+	ui.add_child(root)
+	var heading := UiKit.title("Credits", 76, Color.WHITE, 16)
+	heading.position = Vector2(90, 50)
+	root.add_child(heading)
+
+	var card := PanelContainer.new()
+	card.position = Vector2(80, 210)
+	card.custom_minimum_size = Vector2(640, 660)
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.04, 0.05, 0.08, 0.82)
+	box.border_color = Color(1, 1, 1, 0.1)
+	box.set_border_width_all(1)
+	box.border_width_left = 6
+	box.border_color = UiKit.ACCENT
+	box.set_corner_radius_all(18)
+	box.content_margin_left = 40
+	box.content_margin_right = 40
+	box.content_margin_top = 34
+	box.content_margin_bottom = 36
+	box.shadow_color = Color(0, 0, 0, 0.35)
+	box.shadow_size = 16
+	card.add_theme_stylebox_override("panel", box)
+	root.add_child(card)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	card.add_child(v)
+	var kicker := UiKit.label("", 26, UiKit.ACCENT, 0)
+	kicker.add_theme_font_override("font", UiKit.key_font())
+	v.add_child(kicker)
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 16)
+	v.add_child(name_row)
+	var who := UiKit.title("", 60, Color.WHITE, 8)
+	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	who.custom_minimum_size = Vector2(380, 0)
+	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_row.add_child(who)
+	var nick := PanelContainer.new()
+	var nb := StyleBoxFlat.new()
+	nb.bg_color = Color(UiKit.ACCENT, 0.16)
+	nb.border_color = Color(UiKit.ACCENT, 0.7)
+	nb.set_border_width_all(2)
+	nb.set_corner_radius_all(30)
+	nb.content_margin_left = 20
+	nb.content_margin_right = 20
+	nb.content_margin_top = 6
+	nb.content_margin_bottom = 6
+	nick.add_theme_stylebox_override("panel", nb)
+	nick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_row.add_child(nick)
+	var nick_l := UiKit.label("", 30, UiKit.ACCENT, 0)
+	nick_l.add_theme_font_override("font", UiKit.key_font())
+	nick.add_child(nick_l)
+	var rule := ColorRect.new()
+	rule.color = Color(1, 1, 1, 0.12)
+	rule.custom_minimum_size = Vector2(0, 2)
+	v.add_child(rule)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 8)
+	list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(list)
+
+	# Prev / count / next at the foot of the card, Back below it.
+	var nav := HBoxContainer.new()
+	nav.add_theme_constant_override("separation", 18)
+	v.add_child(nav)
+	var prev := UiKit.button("<", UiKit.BLUE, 48, Vector2(96, 84))
+	prev.pressed.connect(_credit_go.bind(-1))
+	nav.add_child(prev)
+	var count := UiKit.title("", 40, Color.WHITE, 8)
+	count.custom_minimum_size = Vector2(150, 0)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	nav.add_child(count)
+	var next := UiKit.button(">", UiKit.BLUE, 48, Vector2(96, 84))
+	next.pressed.connect(_credit_go.bind(1))
+	nav.add_child(next)
+
+	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
+	back.position = Vector2(80, 940)
+	back.pressed.connect(func(): _show("main"))
+	root.add_child(back)
+	_credit_card = {"card": card, "kicker": kicker, "who": who, "nick": nick, "nick_l": nick_l, "list": list, "count": count}
+	return root
+
+
+func _credit_go(step: int) -> void:
+	var n := _team.size() + 1
+	_credit_i = posmod(_credit_i + step, n)
+	_credit_auto = CREDIT_STEP if _credit_i > 0 else 3.5
+	_fill_credit()
+	_glide(_shot("credits"))
+	Sfx.play("ui_whoosh")
+
+
+func _fill_credit() -> void:
+	if _credit_card.is_empty():
+		return
+	var c := _credit_card
+	for child in (c.list as VBoxContainer).get_children():
+		child.queue_free()
+	(c.count as Label).text = "%d / %d" % [_credit_i + 1, _team.size() + 1]
+	var lines: Array = []
+	# Close-ups show only that person's name tag (the others would crowd the card).
+	for k in _team.size():
+		(_team[k].tag as Node3D).visible = _credit_i == 0 or _credit_i == k + 1
+	if _credit_i == 0 or _credit_i > _team.size():
+		c.kicker.text = "MADE BY"
+		c.who.text = "The Tumbang Henyo team"
+		c.nick.visible = false
+		for t in _team:
+			lines.append("%s  \u00b7  %s" % [t.member.nick, t.member.title])
+	else:
+		var m: Dictionary = _team[_credit_i - 1].member
+		c.kicker.text = String(m.title).to_upper()
+		c.who.text = m.name
+		c.nick.visible = true
+		c.nick_l.text = m.nick
+		lines = m.roles
+	for line in lines:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		var dot := ColorRect.new()
+		dot.color = UiKit.ACCENT
+		dot.custom_minimum_size = Vector2(8, 8)
+		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(dot)
+		row.add_child(UiKit.label(line, 32, Color(1, 1, 1, 0.88), 0))
+		(c.list as VBoxContainer).add_child(row)
+	# Text fades in; the card itself stays put (its size never changes).
+	for node in [c.kicker, c.who, c.nick, c.list]:
+		var ci := node as CanvasItem
+		ci.modulate.a = 0.0
+		create_tween().tween_property(ci, "modulate:a", 1.0, 0.3)

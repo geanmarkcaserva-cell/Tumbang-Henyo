@@ -222,6 +222,7 @@ func _physics_process(delta: float) -> void:
 		_airborne = false
 	if _airborne:
 		apply_central_force(_wind_accel * mass)
+	_keep_in_play_area()
 
 	if _time > 0.3 and linear_velocity.length() < SETTLE_SPEED:
 		_still_time += delta
@@ -231,6 +232,29 @@ func _physics_process(delta: float) -> void:
 	if _still_time > SETTLE_TIME or _time > MAX_LIFETIME or global_position.y < -5.0:
 		_done = true
 		settled.emit()
+
+
+## Never leave the barangay: if a slipper somehow gets past the invisible wall
+## round the fence, it's put back inside and bounced back in.
+func _keep_in_play_area() -> void:
+	var root := get_tree().root
+	if not root.has_meta("play_area"):
+		return
+	var area: Rect2 = (root.get_meta("play_area") as Rect2).grow(-0.4)
+	var p := global_position
+	var v := linear_velocity
+	var moved := false
+	if p.x < area.position.x or p.x > area.end.x:
+		p.x = clampf(p.x, area.position.x, area.end.x)
+		v.x = -v.x * 0.5
+		moved = true
+	if p.z < area.position.y or p.z > area.end.y:
+		p.z = clampf(p.z, area.position.y, area.end.y)
+		v.z = -v.z * 0.5
+		moved = true
+	if moved:
+		global_position = p
+		linear_velocity = v
 
 
 func _on_hit_zone_body_entered(body: Node3D) -> void:

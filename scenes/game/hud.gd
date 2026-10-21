@@ -364,6 +364,47 @@ func show_banner(title: String, subtitle: String, color: Color = UiKit.ACCENT, s
 	_banner_tween.chain().tween_callback(func(): _banner.visible = false)
 
 
+## Mama's punch: a red-white flash and a comic "POW!" that slams in and shakes.
+func punch_fx() -> void:
+	var flash := ColorRect.new()
+	flash.color = Color(1.0, 0.95, 0.9, 0.85)
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash.z_index = 39
+	add_child(flash)
+	var ft := create_tween().set_ignore_time_scale(true)
+	ft.tween_property(flash, "color", Color(0.85, 0.08, 0.06, 0.45), 0.08)
+	ft.tween_property(flash, "color", Color(0.85, 0.08, 0.06, 0.0), 0.5)
+	ft.tween_callback(flash.queue_free)
+
+	var vp := get_viewport().get_visible_rect().size
+	var burst := Label.new()
+	burst.text = "POW!"
+	UiKit.use_title_font(burst)
+	burst.add_theme_font_size_override("font_size", 150)
+	burst.add_theme_color_override("font_color", Color(1.0, 0.86, 0.2))
+	burst.add_theme_color_override("font_outline_color", Color(0.45, 0.04, 0.02))
+	burst.add_theme_constant_override("outline_size", 34)
+	burst.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	burst.z_index = 39
+	add_child(burst)
+	burst.reset_size()
+	var centre := Vector2(vp.x * 0.5, vp.y * 0.36)
+	burst.position = centre - burst.size * 0.5
+	burst.pivot_offset = burst.size * 0.5
+	burst.rotation = deg_to_rad(randf_range(-14.0, -6.0))
+	burst.scale = Vector2.ONE * 2.6
+	var bt := create_tween().set_ignore_time_scale(true)
+	bt.tween_property(burst, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for i in 6:
+		bt.tween_property(burst, "position", centre - burst.size * 0.5 + Vector2(randf_range(-14, 14), randf_range(-10, 10)), 0.035)
+	bt.tween_property(burst, "position", centre - burst.size * 0.5, 0.04)
+	bt.tween_interval(0.35)
+	bt.tween_property(burst, "modulate:a", 0.0, 0.3)
+	bt.parallel().tween_property(burst, "scale", Vector2.ONE * 1.25, 0.3)
+	bt.tween_callback(burst.queue_free)
+
+
 # --- Class game leaderboard ------------------------------------------------------
 
 ## Class game (multiplayer): a pill left of the Round pill with your place;
@@ -540,12 +581,12 @@ func show_pause(on: bool) -> void:
 
 
 func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: int, won: bool = false) -> void:
-	_over_title.text = "Nakauwi ka na!" if won else "Game over"
+	_over_title.text = "Home safe!" if won else "Game over"
 	_over_title.add_theme_color_override("font_color", Color(0.62, 0.92, 1.0) if won else Color.WHITE)
 	var lines := [
 		"Score:  %s" % _thousands(score),
 		"Rounds cleared:  %d" % rounds,
-		"Tansan earned:  %d" % caps_earned,
+		"Caps earned:  %d" % caps_earned,
 	]
 	if rank == 1:
 		lines.append("NEW BEST!")
@@ -624,7 +665,7 @@ func _build_stats() -> void:
 
 	_awra_icon = _icon(ICON_AWRA, Vector2(12, 8), Vector2(100, 100))
 	card.add_child(_awra_icon)
-	var cap := UiKit.title("Awra", 32, Color.WHITE, 8)
+	var cap := UiKit.title("Aura", 32, Color.WHITE, 8)
 	cap.position = Vector2(126, 8)
 	card.add_child(cap)
 	_awra_value = UiKit.title("100", 44, Color.WHITE, 8)

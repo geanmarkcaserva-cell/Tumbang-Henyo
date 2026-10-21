@@ -9,15 +9,18 @@ extends Node
 ## Drop a file at a track's path and it's used; until then the track falls
 ## back to FALLBACK (see docs/AUDIO.md).
 const TRACKS := {
-	"menu": "res://art/Audio/Bg music default.mp3",
+	# Both are cut on whole bars so the loop point lands on the beat with no gap.
+	"menu": "res://art/Audio/music/menu_loop.ogg",
 	"game": "res://art/Audio/music/game.ogg", # gameplay song (not made yet)
+	"running": "res://art/Audio/music/running_loop.ogg", # after a lata hit
 	"mama": "res://art/Audio/music/mama_chase.ogg", # Mama's chase (not made yet)
 }
 const FALLBACK := {
 	"game": "menu",
-	"mama": "game",
+	"mama": "running",
+	"running": "game",
 }
-@export var volume_db := -8.0 ## a bit under the sound effects
+@export var volume_db := -2.0 ## louder than before; Settings' Music slider still scales it
 const FADE := 1.2
 
 var _a: AudioStreamPlayer
@@ -36,7 +39,7 @@ func _ready() -> void:
 	add_child(_b)
 
 
-func play(track: String) -> void:
+func play(track: String, fade: float = FADE) -> void:
 	var path: String = TRACKS.get(track, "")
 	while path != "" and not ResourceLoader.exists(path) and FALLBACK.has(track):
 		track = FALLBACK[track]
@@ -58,9 +61,9 @@ func play(track: String) -> void:
 	if _tween:
 		_tween.kill()
 	_tween = create_tween().set_parallel(true)
-	_tween.tween_property(incoming, "volume_db", volume_db, FADE)
+	_tween.tween_property(incoming, "volume_db", volume_db, fade)
 	if outgoing.playing:
-		_tween.tween_property(outgoing, "volume_db", -40.0, FADE)
+		_tween.tween_property(outgoing, "volume_db", -40.0, fade)
 		_tween.chain().tween_callback(outgoing.stop)
 
 

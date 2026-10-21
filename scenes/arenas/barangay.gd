@@ -71,6 +71,7 @@ func _ready() -> void:
 					Basis(Vector3.UP, float(b.get("ry", 0.0)))])
 	_build_props()
 	_build_fence()
+	_build_map_wall()
 	if layout.has("houses"):
 		for n in env.find_children("House_*", "", true, false):
 			n.queue_free()
@@ -494,6 +495,41 @@ func set_open_world(on: bool) -> void:
 
 
 # --- Fence round the barangay -----------------------------------------------------
+
+## An invisible wall just outside the fence, thick and sky-high, so nobody gets
+## out by jumping off a roof over the fence, and a slipper thrown over it
+## bounces back in (a taya has to be able to go and pick it up again).
+const MAP_WALL_HEIGHT := 120.0
+const MAP_WALL_THICK := 6.0
+const MAP_WALL_BOUNCE := 0.55 ## slippers spring back off it
+
+func _build_map_wall() -> void:
+	var wall := StaticBody3D.new()
+	wall.name = "MapWall"
+	var pm := PhysicsMaterial.new()
+	pm.bounce = MAP_WALL_BOUNCE
+	pm.friction = 0.2
+	wall.physics_material_override = pm
+	add_child(wall)
+	var r := MAP_RECT
+	var t := MAP_WALL_THICK
+	var y := MAP_WALL_HEIGHT * 0.5 - 2.0
+	# (centre, size): inner faces sit on the fence line (+0.15, its half-thickness).
+	var sides := [
+		[Vector3(r.position.x - 0.15 - t * 0.5, y, r.get_center().y), Vector3(t, MAP_WALL_HEIGHT, r.size.y + t * 2.0)],
+		[Vector3(r.end.x + 0.15 + t * 0.5, y, r.get_center().y), Vector3(t, MAP_WALL_HEIGHT, r.size.y + t * 2.0)],
+		[Vector3(r.get_center().x, y, r.position.y - 0.15 - t * 0.5), Vector3(r.size.x + t * 2.0, MAP_WALL_HEIGHT, t)],
+		[Vector3(r.get_center().x, y, r.end.y + 0.15 + t * 0.5), Vector3(r.size.x + t * 2.0, MAP_WALL_HEIGHT, t)],
+	]
+	for side in sides:
+		var cs := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = side[1]
+		cs.shape = box
+		cs.position = side[0]
+		wall.add_child(cs)
+	# Slippers check this too, in case one ever slips through.
+	get_tree().root.set_meta("play_area", r)
 
 ## Chain-link (cyclone wire) on steel posts all the way round MAP_RECT, with a
 ## top rail. Solid and tall enough that you can't jump it.

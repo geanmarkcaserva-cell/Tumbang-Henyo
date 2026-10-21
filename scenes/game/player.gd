@@ -79,6 +79,18 @@ func stagger(duration: float, push: Vector3) -> void:
 	hurt()
 
 
+## Camera shake (Mama's punch): the view jolts and settles over `time`.
+func shake(amount: float = 0.35, time: float = 0.45) -> void:
+	var t := create_tween().set_ignore_time_scale(true)
+	var steps := 8
+	for i in steps:
+		var k := amount * (1.0 - float(i) / steps)
+		t.tween_property(_camera, "h_offset", randf_range(-k, k), time / steps)
+		t.parallel().tween_property(_camera, "v_offset", randf_range(-k, k) * 0.7, time / steps)
+	t.tween_property(_camera, "h_offset", 0.0, 0.05)
+	t.parallel().tween_property(_camera, "v_offset", 0.0, 0.05)
+
+
 ## Damage feedback (wrong answer, tsinelas hit): squish and flash red.
 func hurt() -> void:
 	$PaperDoll.hurt()

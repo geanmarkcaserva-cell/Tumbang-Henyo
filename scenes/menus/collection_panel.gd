@@ -43,7 +43,7 @@ func _ready() -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 14)
 	v.add_child(tabs)
-	for t in [["items", "Hidden items"], ["characters", "Characters"], ["slippers", "Tsinelas"]]:
+	for t in [["items", "Hidden items"], ["characters", "Characters"], ["slippers", "Slippers"]]:
 		var b := UiKit.button(t[1], UiKit.BLUE, 30, Vector2(260, 76))
 		var id: String = t[0]
 		b.pressed.connect(func():
@@ -93,7 +93,7 @@ func refresh() -> void:
 	if _tab == "slippers":
 		_fill_shop(Economy.SLIPPERS, false)
 		return
-	_sub.text = "Hidden things turn up around the barangay in some rounds - often up on a roof. Grab them before you reach the finish!"
+	_sub.text = "Hidden things turn up around the neighborhood in some rounds - often up on a roof. Grab them before you reach the finish!"
 	var got := 0
 	for it in EasterEggs.ITEMS:
 		var found := Economy.has_collected(it.id)
@@ -119,7 +119,7 @@ func _fill_shop(list: Array, characters: bool) -> void:
 		_grid.add_child(_shop_card(it, mine, characters))
 	_count.text = "%d / %d" % [got, list.size()]
 	_sub.text = ("Everyone in the barkada you can play as. Buy them in character select." if characters
-		else "Every pair of tsinelas you can throw. Buy them in weapon select.")
+		else "Every pair of slippers you can throw. Buy them in weapon select.")
 	if got >= list.size():
 		_footer.text = "You have them all!"
 		_footer.add_theme_color_override("font_color", UiKit.ACCENT)
@@ -173,7 +173,7 @@ func _shop_card(it: Dictionary, mine: bool, character: bool) -> Control:
 	elif not Economy.requirement_met(it.id):
 		info = Economy.requirement_text(it.id)
 	else:
-		info = "%d tansan" % it.price
+		info = "%d caps" % it.price
 	var info_l := UiKit.label(info, 24, UiKit.ACCENT if mine else Color(1, 1, 1, 0.5))
 	info_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(info_l)
@@ -302,7 +302,7 @@ func _open_detail(kind: String, it: Dictionary, mine: bool) -> void:
 	v.add_theme_constant_override("separation", 18)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(v)
-	v.add_child(UiKit.label({"item": "Hidden item", "character": "Character", "slipper": "Tsinelas"}[kind], 28, UiKit.ACCENT))
+	v.add_child(UiKit.label({"item": "Hidden item", "character": "Character", "slipper": "Slipper"}[kind], 28, UiKit.ACCENT))
 	var name_l := UiKit.title(it.name if mine else "???", 72, Color.WHITE, 14)
 	v.add_child(name_l)
 	v.add_child(UiKit.accent_rule())
@@ -370,7 +370,7 @@ func _detail_text(kind: String, it: Dictionary, mine: bool) -> String:
 		return it.desc
 	match kind:
 		"item":
-			return "Still hidden somewhere in the barangay. It shows up in round %d - keep your eyes on the rooftops." % it.round
+			return "Still hidden somewhere in the neighborhood. It shows up in round %d - keep your eyes on the rooftops." % it.round
 		"character":
 			return "Still locked. Get them in character select to read their story."
 	return "Still locked. Buy them in weapon select to see what they can do."
@@ -388,9 +388,9 @@ func _detail_facts(kind: String, it: Dictionary, mine: bool) -> Array:
 		if mine:
 			out.append("Owned")
 		elif not Economy.requirement_met(it.id):
-			out.append(Economy.requirement_text(it.id) + "  -  %d tansan" % it.price)
+			out.append(Economy.requirement_text(it.id) + "  -  %d caps" % it.price)
 		else:
-			out.append("%d tansan" % it.price)
+			out.append("%d caps" % it.price)
 	return out
 
 

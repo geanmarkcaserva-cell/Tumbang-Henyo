@@ -52,7 +52,7 @@ func _build_hint() -> void:
 	_hint_btn.add_theme_constant_override("icon_max_width", 40)
 	_hint_btn.add_theme_constant_override("h_separation", 10)
 	_hint_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	_hint_btn.tooltip_text = "Crosses out one wrong answer. Costs 100 tansan, so studying is cheaper!"
+	_hint_btn.tooltip_text = "Crosses out one wrong answer. Costs 100 caps, so studying is cheaper!"
 	_hint_btn.focus_mode = Control.FOCUS_NONE
 	_hint_btn.pressed.connect(func():
 		if _active and not _hint_used:
@@ -68,8 +68,8 @@ func set_hint(shown: bool, cost: int, affordable: bool) -> void:
 	_hint_btn.visible = shown
 	_hint_btn.text = "Hint  %d" % cost
 	_hint_btn.disabled = not affordable or _hint_used
-	_hint_btn.tooltip_text = "Crosses out one wrong answer for %d tansan." % cost if affordable \
-			else "You need %d tansan for a hint. Study instead!" % cost
+	_hint_btn.tooltip_text = "Crosses out one wrong answer for %d caps." % cost if affordable \
+			else "You need %d caps for a hint. Study instead!" % cost
 
 
 ## True while a hint can still be bought for the current question.
@@ -139,9 +139,9 @@ func show_result(chosen: int, correct: int, explanation: String) -> void:
 	else:
 		Sfx.play("correct" if chosen == correct else "wrong")
 	if chosen == correct:
-		_feedback.text = "Tama!"
+		_feedback.text = "Correct!"
 	elif chosen < 0:
-		_feedback.text = "Ubos na ang oras! " + explanation
+		_feedback.text = "Time's up! " + explanation
 	else:
 		_feedback.text = "Mali! " + explanation
 

@@ -174,7 +174,7 @@ static func _ensure_opaque(c: CanvasItem) -> void:
 		c.modulate.a = 1.0
 
 
-## A quick punch: grows to `amount` and springs back (score ticks, "Tama!").
+## A quick punch: grows to `amount` and springs back (score ticks, "Correct!").
 static func bounce(c: Control, amount: float = 1.18, duration: float = 0.5) -> void:
 	_ensure_opaque(c)
 	_centre_pivot(c)

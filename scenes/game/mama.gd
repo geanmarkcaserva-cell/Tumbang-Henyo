@@ -31,11 +31,11 @@ const PROJECTILE_SPEED := 17.0
 const AIM_SCATTER := 0.7
 ## Shout text -> her recorded line (drop the files into art/Audio/sfx).
 const SHOUT_VOICES := {
-	"HOY! HALIKA DITO!": "voice_mama_halika",
-	"HOY!": "voice_mama_hoy",
-	"HALIKA DITO!": "voice_mama_halika",
-	"LAGOT KA!": "voice_mama_lagot",
-	"UWI NA!": "voice_mama_uwi",
+	"HEY! GET OVER HERE!": "voice_mama_halika",
+	"HEY!": "voice_mama_hoy",
+	"COME HERE!": "voice_mama_halika",
+	"YOU'RE IN TROUBLE!": "voice_mama_lagot",
+	"GO HOME!": "voice_mama_uwi",
 }
 
 ## The sprite: 18 x 30, belt raised over her head. Two front frames (belt
@@ -235,7 +235,7 @@ func start_chase() -> void:
 	_look_timer = 0.0
 	_throw_cd = HEAD_START + 0.6
 	_stun = HEAD_START # winds up first: a moment to get going
-	_shout_now("HOY! HALIKA DITO!")
+	_shout_now("HEY! GET OVER HERE!")
 
 
 func stop() -> void:
@@ -407,7 +407,7 @@ func _throw() -> void:
 	alive.append(p)
 	_thrown = alive
 	_throw_cd = randf_range(THROW_COOLDOWN.x, THROW_COOLDOWN.y)
-	_shout_now(["HOY!", "HALIKA DITO!", "LAGOT KA!", "UWI NA!"].pick_random())
+	_shout_now(["HEY!", "COME HERE!", "YOU'RE IN TROUBLE!", "GO HOME!"].pick_random())
 
 
 func _clear_line(a: Vector3, b: Vector3) -> bool:

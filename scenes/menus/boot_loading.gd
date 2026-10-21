@@ -9,9 +9,9 @@ const MASCOT := preload("res://art/ui/loading_slipper.png")
 
 const STEPS := [
 	"Loading quiz questions...",
-	"Building the barangay court...",
+	"Building the neighborhood court...",
 	"Waking up the taya...",
-	"Preparing tsinelas physics...",
+	"Preparing slipper physics...",
 	"Almost there...",
 ]
 
@@ -72,7 +72,12 @@ func _process(delta: float) -> void:
 
 	if status == ResourceLoader.THREAD_LOAD_LOADED and _time >= min_time:
 		set_process(false)
-		Transition.change_scene(ResourceLoader.load_threaded_get(GameManager.MAIN_MENU))
+		var menu: PackedScene = ResourceLoader.load_threaded_get(GameManager.MAIN_MENU)
+		if ResourceLoader.exists(GameManager.TRAILER_VIDEO):
+			GameManager.after_trailer = menu # the trailer first, then the menu
+			Transition.change_scene(GameManager.TRAILER)
+		else:
+			Transition.change_scene(menu)
 	elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
 		set_process(false)
 		push_error("Boot loading: could not load the main menu")

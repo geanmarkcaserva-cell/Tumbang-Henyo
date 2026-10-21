@@ -24,9 +24,11 @@ const COURT_START := 4 ## how many start out on the court (the rest are around t
 const NAV_GROUND := 1.0
 
 var sheet := "" ## res:// path of the sheet
+var tag := "" ## nickname shown over the head (the Team members)
 var speed := 1.3
 
 var _doll: PaperDoll
+var _tag: NameTag
 var _do := Do.PAUSE
 var _wait := 0.0
 var _path := PackedVector3Array()
@@ -65,6 +67,10 @@ static func spawn_all(parent: Node3D, barangay: Node, keep_clear: Array = []) ->
 	var houses: Array = barangay.house_boxes() if barangay and barangay.has_method("house_boxes") else []
 	var space := parent.get_world_3d().direct_space_state
 	var paths := sheets()
+	# The team that made the game walks around too (no name tags out here;
+	# those are only on the Credits screen).
+	for m in Team.present():
+		paths.append(Team.sheet(m))
 	var order := range(paths.size())
 	order.shuffle()
 	for k in order.size():
@@ -124,6 +130,11 @@ func _ready() -> void:
 	_doll.wobble_deg = 5.0
 	add_child(_doll)
 	_doll.set_look(PixelArt.single_sheet_look(sheet))
+	if tag != "":
+		_tag = NameTag.new()
+		_tag.text = tag
+		_tag.position.y = PixelArt.MAX_HEIGHT + 0.32
+		add_child(_tag)
 	# Kids hurry, grown-ups stroll (the kid sheets are the short ones).
 	var kid := "bata" in sheet.to_lower()
 	speed = randf_range(1.9, 2.4) if kid else randf_range(1.05, 1.5)
@@ -263,7 +274,10 @@ func _arrive() -> void:
 	var t := create_tween().set_parallel()
 	t.tween_property(self, "global_position", global_position + into * 0.6, 0.35)
 	t.tween_property(_doll, "scale", Vector3(0.05, 1.3, 0.05), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	t.chain().tween_callback(func(): _doll.visible = false)
+	t.chain().tween_callback(func():
+		_doll.visible = false
+		if _tag:
+			_tag.visible = false)
 
 
 func _come_out() -> void:
@@ -273,6 +287,8 @@ func _come_out() -> void:
 	if away != Vector3.ZERO:
 		global_basis = Basis.looking_at(away, Vector3.UP)
 	_doll.visible = true
+	if _tag:
+		_tag.visible = true
 	_do = Do.PAUSE
 	_wait = randf_range(1.0, 3.5)
 	var t := create_tween().set_parallel()

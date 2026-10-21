@@ -22,54 +22,54 @@ const CHIME_PATH := "res://art/Audio/sfx/achievement.wav"
 const LIST := [
 	# Getting started
 	{"id": "first_steps", "name": "First Steps", "desc": "Finish the tutorial.", "tier": "bronze"},
-	{"id": "tama", "name": "Tama!", "desc": "Answer your first question right.", "tier": "bronze"},
-	{"id": "tumba", "name": "Tumba!", "desc": "Knock down the lata.", "tier": "bronze"},
-	{"id": "takbo", "name": "Takbo!", "desc": "Clear your first round.", "tier": "bronze"},
-	{"id": "regular", "name": "Suki", "desc": "Play 10 runs.", "tier": "bronze", "stat": "runs", "goal": 10},
+	{"id": "tama", "name": "Correct!", "desc": "Answer your first question right.", "tier": "bronze"},
+	{"id": "tumba", "name": "Knockdown!", "desc": "Knock down the can.", "tier": "bronze"},
+	{"id": "takbo", "name": "Run!", "desc": "Clear your first round.", "tier": "bronze"},
+	{"id": "regular", "name": "Regular", "desc": "Play 10 runs.", "tier": "bronze", "stat": "runs", "goal": 10},
 	# Quiz skill
 	{"id": "speed_reader", "name": "Speed Reader", "desc": "Answer right with 12 seconds or more left.", "tier": "bronze"},
 	{"id": "henyo", "name": "Henyo", "desc": "Answer 10 questions in a row right in one run.", "tier": "silver"},
 	{"id": "scholar", "name": "Scholar", "desc": "Answer 100 questions right.", "tier": "platinum", "stat": "correct_total", "goal": 100},
 	# Throwing
-	{"id": "bullseye", "name": "Bullseye!", "desc": "Land a perfect, clean hit on the lata.", "tier": "silver"},
+	{"id": "bullseye", "name": "Bullseye!", "desc": "Land a perfect, clean hit on the can.", "tier": "silver"},
 	{"id": "sharpshooter", "name": "Sharpshooter", "desc": "Land 5 bullseyes in one run.", "tier": "gold"},
 	{"id": "ten_hit_wonder", "name": "10 Hit Wonder", "desc": "Land 10 bullseyes in one run.", "tier": "platinum"},
-	{"id": "windy", "name": "Against the Wind", "desc": "Knock down the lata in strong wind.", "tier": "silver"},
+	{"id": "windy", "name": "Against the Wind", "desc": "Knock down the can in strong wind.", "tier": "silver"},
 	# Running
-	{"id": "flawless", "name": "Walang Mintis", "desc": "Clear a round with no wrong answer, no miss and no hit.", "tier": "silver"},
-	{"id": "untouchable", "name": "Untouchable", "desc": "Clear a round against 3 or more tayas without a tsinelas hitting you.", "tier": "silver"},
+	{"id": "flawless", "name": "Flawless", "desc": "Clear a round with no wrong answer, no miss and no hit.", "tier": "silver"},
+	{"id": "untouchable", "name": "Untouchable", "desc": "Clear a round against 3 or more tayas without a slipper hitting you.", "tier": "silver"},
 	{"id": "elite", "name": "Elite Escape", "desc": "Clear a round with an elite taya on the court.", "tier": "silver"},
-	{"id": "last_breath", "name": "Last Breath", "desc": "Clear a round with 15 Awra or less.", "tier": "silver"},
+	{"id": "last_breath", "name": "Last Breath", "desc": "Clear a round with 15 Aura or less.", "tier": "silver"},
 	# Story
 	{"id": "mamas_home", "name": "Mama's Home", "desc": "Stay out until 6:00 PM.", "tier": "gold", "secret": true},
-	{"id": "nakauwi", "name": "Nakauwi Na!", "desc": "Make it home before Mama catches you.", "tier": "gold", "secret": true},
+	{"id": "nakauwi", "name": "Home Safe!", "desc": "Make it home before Mama catches you.", "tier": "gold", "secret": true},
 	{"id": "hanger_dodger", "name": "Hanger Dodger", "desc": "Get home without a hanger or walis hitting you.", "tier": "platinum", "secret": true},
 	# Secrets around the barangay (EasterEggs)
-	{"id": "egg_trumpo", "name": "Paikot-ikot", "desc": "Find the trumpo on a rooftop.", "tier": "silver"},
-	{"id": "egg_golden", "name": "Gintong Tsinelas", "desc": "Find the golden tsinelas.", "tier": "silver"},
-	{"id": "egg_tungkod", "name": "Tungkod ni Lolo", "desc": "Find Lolo's tungkod in an alley.", "tier": "silver"},
-	{"id": "egg_kite", "name": "Saranggola", "desc": "Get the kite stuck on a roof.", "tier": "silver"},
-	{"id": "egg_marble", "name": "Higanteng Holen", "desc": "Climb to the big marble.", "tier": "gold"},
-	{"id": "all_eggs", "name": "Kumpleto!", "desc": "Find all five hidden items. Something waits after Mama's round...", "tier": "platinum", "secret": true},
-	{"id": "night_out", "name": "Gabi Na", "desc": "Keep playing with your friends after Mama's round.", "tier": "gold", "secret": true},
-	{"id": "curfew", "name": "Takas sa Tanod", "desc": "Get home before the tanods catch you at 7:00 PM.", "tier": "platinum", "secret": true},
+	{"id": "egg_trumpo", "name": "Round and Round", "desc": "Find the spinning top on a rooftop.", "tier": "silver"},
+	{"id": "egg_golden", "name": "Golden Slipper", "desc": "Find the golden slipper.", "tier": "silver"},
+	{"id": "egg_tungkod", "name": "Grandpa's Cane", "desc": "Find Grandpa's cane in an alley.", "tier": "silver"},
+	{"id": "egg_kite", "name": "Kite", "desc": "Get the kite stuck on a roof.", "tier": "silver"},
+	{"id": "egg_marble", "name": "Giant Marble", "desc": "Climb to the big marble.", "tier": "gold"},
+	{"id": "all_eggs", "name": "Complete!", "desc": "Find all five hidden items. Something waits after Mama's round...", "tier": "platinum", "secret": true},
+	{"id": "night_out", "name": "Nightfall", "desc": "Keep playing with your friends after Mama's round.", "tier": "gold", "secret": true},
+	{"id": "curfew", "name": "Curfew Escape", "desc": "Get home before the tanods catch you at 7:00 PM.", "tier": "platinum", "secret": true},
 	# Score and shop
 	{"id": "big_score", "name": "High Scorer", "desc": "Score 10,000 points in one run.", "tier": "gold"},
-	{"id": "legend", "name": "Alamat", "desc": "Score 15,000 points in one run.", "tier": "platinum"},
-	{"id": "collector", "name": "Tansan Collector", "desc": "Have 1,000 tansan.", "tier": "platinum"},
-	{"id": "shopper", "name": "Suki ng Tindahan", "desc": "Buy something from the shop.", "tier": "bronze"},
+	{"id": "legend", "name": "Legend", "desc": "Score 15,000 points in one run.", "tier": "platinum"},
+	{"id": "collector", "name": "Cap Collector", "desc": "Have 1,000 caps.", "tier": "platinum"},
+	{"id": "shopper", "name": "Store Regular", "desc": "Buy something from the shop.", "tier": "bronze"},
 	{"id": "new_friend", "name": "New Friend", "desc": "Buy a character.", "tier": "bronze"},
 	{"id": "barkada", "name": "Barkada", "desc": "Own 4 characters.", "tier": "silver"},
 	{"id": "whole_barkada", "name": "The Whole Barkada", "desc": "Own every character.", "tier": "gold"},
-	{"id": "fresh_pair", "name": "Fresh Pair", "desc": "Buy a pair of tsinelas.", "tier": "bronze"},
-	{"id": "shoe_rack", "name": "Shoe Rack", "desc": "Own 4 pairs of tsinelas.", "tier": "silver"},
-	{"id": "tsinelas_collector", "name": "Tsinelas Collector", "desc": "Own every pair of tsinelas.", "tier": "gold"},
+	{"id": "fresh_pair", "name": "Fresh Pair", "desc": "Buy a pair of slippers.", "tier": "bronze"},
+	{"id": "shoe_rack", "name": "Shoe Rack", "desc": "Own 4 pairs of slippers.", "tier": "silver"},
+	{"id": "tsinelas_collector", "name": "Slipper Collector", "desc": "Own every pair of slippers.", "tier": "gold"},
 	{"id": "half_heart", "name": "Half a Heart", "desc": "Buy GM or Ashiela. Somewhere, their other half is waiting.", "tier": "platinum", "secret": true},
 	{"id": "full_heart", "name": "Full Heart", "desc": "Buy both GM and Ashiela. Together again.", "tier": "platinum", "secret": true},
 	# Class and teacher
 	{"id": "quiz_maker", "name": "Quiz Maker", "desc": "Save your own custom quiz.", "tier": "bronze"},
 	{"id": "classmate", "name": "Classmate", "desc": "Join a class game.", "tier": "bronze"},
-	{"id": "teacher", "name": "Guro", "desc": "Host a class game.", "tier": "silver"},
+	{"id": "teacher", "name": "Teacher", "desc": "Host a class game.", "tier": "silver"},
 	{"id": "class_champ", "name": "Class Champion", "desc": "Finish first in a class game.", "tier": "gold"},
 ]
 
@@ -188,10 +188,9 @@ func _show_next() -> void:
 		_show_next())
 
 
-## Phones (touch controls on): top centre, clear of the thumb buttons.
-## PC: bottom right, like Steam.
+## Top centre, sliding down, on every platform (PC matches the phone build).
 func _top() -> bool:
-	return Settings.touch_controls
+	return true
 
 
 func _place_toast() -> void:

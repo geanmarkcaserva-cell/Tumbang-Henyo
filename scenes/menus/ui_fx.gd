@@ -58,8 +58,19 @@ static func _pin(c: Control, factor: float) -> void:
 ## right quarter toward the right; pieces spanning both (or neither) shrink
 ## toward their middle. Same for top and bottom.
 static func _update_pin_pivot(c: Control) -> void:
-	var r := c.get_rect()
-	c.pivot_offset = c.size * Vector2(_edge(r.position.x, r.end.x, DESIGN.x), _edge(r.position.y, r.end.y, DESIGN.y))
+	# The laid-out rect, before scaling: get_rect() is already shrunk, and a
+	# small HUD (0.7) made full-width pieces look like left-side ones, so the
+	# pause card, status text and key hints slid to the left.
+	var r := Rect2(c.position, c.size)
+	# Measured against what the piece really sits in (the whole screen on
+	# wide phones and 16:10 monitors), not the 1920 x 1080 it was drawn for.
+	var span := DESIGN
+	var parent := c.get_parent() as Control
+	if parent and parent.size.x > 0.0 and parent.size.y > 0.0:
+		span = parent.size
+	elif c.is_inside_tree():
+		span = c.get_viewport_rect().size
+	c.pivot_offset = c.size * Vector2(_edge(r.position.x, r.end.x, span.x), _edge(r.position.y, r.end.y, span.y))
 
 
 static func _edge(start: float, end: float, span: float) -> float:

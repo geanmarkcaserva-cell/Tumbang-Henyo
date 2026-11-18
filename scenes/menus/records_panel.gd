@@ -4,7 +4,7 @@ extends Control
 ## device (CustomRecords), newest first. Each shows the set's title and
 ## description, who played and when, the score, how far they got, how many
 ## answers were right, and how it ended. "This set" shows the set open in
-## the editor, "All sets" everything. Clear asks twice.
+## the editor, "All sets" everything. Clear asks twice before it deletes.
 
 signal closed
 

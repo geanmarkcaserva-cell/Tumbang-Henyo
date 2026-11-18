@@ -29,6 +29,10 @@ const LETTERS := "abc"
 const COLOR_RIGHT := Color(0.55, 1.0, 0.6)
 const COLOR_WRONG := Color(1.0, 0.45, 0.45)
 
+const CARD_HEIGHT := 390.0 ## the card's height as drawn in quiz_panel.tscn
+const BOTTOM_GAP := 40.0 ## keyboard: space under the card
+const BOTTOM_GAP_TOUCH := 100.0 ## touch screens: a little higher off the edge
+
 var _time_left := 0.0
 var _active := false
 
@@ -53,6 +57,8 @@ func _ready() -> void:
 		UiFx.hookup_button(_buttons[i])
 	_build_hint()
 	_build_tier_chip()
+	# Deferred, so it runs after the HUD's own resize hook (UiFx) and wins.
+	$Panel.resized.connect(keep_centred, CONNECT_DEFERRED)
 
 
 ## The difficulty chip, on the same line as the "Question" caption. It's part
@@ -92,6 +98,27 @@ func set_difficulty(tier: String) -> void:
 	box.content_margin_top = 4
 	box.content_margin_bottom = 4
 	_tier_chip.add_theme_stylebox_override("normal", box)
+
+
+## The card sits at the bottom centre of the screen; on touch screens a
+## little higher off the edge.
+func set_touch_layout(on: bool) -> void:
+	var p: Control = $Panel
+	var gap := BOTTOM_GAP_TOUCH if on else BOTTOM_GAP
+	p.anchor_top = 1.0
+	p.anchor_bottom = 1.0
+	p.offset_top = -gap - CARD_HEIGHT
+	p.offset_bottom = -gap
+	p.grow_vertical = Control.GROW_DIRECTION_BEGIN # a long question grows upward
+	keep_centred.call_deferred()
+
+
+## The HUD shrinks the card (Settings > HUD size). Shrink it toward its
+## bottom middle, so it stays centred left to right on every screen width
+## (wide phones used to push it to the right).
+func keep_centred() -> void:
+	var p: Control = $Panel
+	p.pivot_offset = Vector2(p.size.x * 0.5, p.size.y)
 
 
 ## "Hint" with a bottle cap and the price, under the timer.

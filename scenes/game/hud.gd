@@ -185,6 +185,7 @@ func _apply_hud_size() -> void:
 		return
 	_hud_k = k
 	UiFx.shrink(self, k)
+	quiz.keep_centred() # shrink re-picks the card's pivot; keep it bottom middle
 	if coach:
 		coach.set_meta("fx_base", Vector2.ONE * k)
 		coach.scale = Vector2.ONE * k
@@ -193,6 +194,7 @@ func _apply_hud_size() -> void:
 func _apply_touch_setting() -> void:
 	touch.visible = Settings.touch_controls
 	TouchControls.active = touch.visible
+	quiz.set_touch_layout(touch.visible) # phones: quiz card a little higher
 	_update_hints()
 
 

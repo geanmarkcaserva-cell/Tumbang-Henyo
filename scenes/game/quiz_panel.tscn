@@ -87,7 +87,6 @@ layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 36
 text = "a)  Choice"
-alignment = 1
 autowrap_mode = 3
 
 [node name="ChoiceB" type="Button" parent="Panel/HBox/Choices" unique_id=244670066]
@@ -97,7 +96,6 @@ layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 36
 text = "b)  Choice"
-alignment = 1
 autowrap_mode = 3
 
 [node name="ChoiceC" type="Button" parent="Panel/HBox/Choices" unique_id=2040415785]
@@ -107,5 +105,4 @@ layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 36
 text = "c)  Choice"
-alignment = 1
 autowrap_mode = 3

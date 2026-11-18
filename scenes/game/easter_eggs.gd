@@ -364,7 +364,7 @@ static func icon(id: String, scale: int = 1) -> Texture2D:
 		var side := int(maxi(used.size.x, used.size.y) * 1.08)
 		var sq := Image.create(side, side, false, Image.FORMAT_RGBA8)
 		sq.fill(Color(0, 0, 0, 0))
-		sq.blit_rect(src, used, Vector2i((side - used.size.x) / 2, (side - used.size.y) / 2))
+		sq.blit_rect(src, used, Vector2i(int((side - used.size.x) / 2.0), int((side - used.size.y) / 2.0)))
 		var px := 16 * scale if scale > 1 else 256
 		sq.resize(px, px, Image.INTERPOLATE_LANCZOS)
 		var t := ImageTexture.create_from_image(sq)

@@ -272,11 +272,58 @@ func close() -> void:
 # --- Class questions ----------------------------------------------------------------
 
 ## The question at this index of the lobby's set ({question, choices, answer, explanation}).
+## Question N of a class game. Like a solo run, the class goes easy -> medium
+## -> hard: questions 1-5 easy, 6-10 medium, then hard (nearest tier when one
+## runs out). The order is worked out the same way on every device from the
+## match seed, so everyone gets the same question.
 func class_question(index: int) -> Dictionary:
 	var pool: Array = QuizDatabase.questions_of(quiz_theme)
 	if pool.is_empty():
 		return {}
-	return pool[posmod(index, pool.size())]
+	var order := _class_order(pool)
+	return pool[order[posmod(index, order.size())]]
+
+
+var _order_key := ""
+var _order_cache: Array = []
+
+## Pool indices in the order the class gets them (see class_question).
+func _class_order(pool: Array) -> Array:
+	var key := "%s|%d|%d" % [quiz_theme, match_seed, pool.size()]
+	if key == _order_key:
+		return _order_cache
+	var rng := RandomNumberGenerator.new()
+	rng.seed = match_seed
+	var queues := {}
+	for t in QuizDatabase.TIERS:
+		queues[t] = []
+	for i in pool.size():
+		var tier: String = String(pool[i].get("tier", "easy"))
+		if not queues.has(tier):
+			tier = "easy"
+		queues[tier].append(i)
+	for t in queues: # shuffle each tier the same way on every device
+		var q: Array = queues[t]
+		for i in range(q.size() - 1, 0, -1):
+			var j := rng.randi_range(0, i)
+			var tmp = q[i]
+			q[i] = q[j]
+			q[j] = tmp
+	var order: Array = []
+	for n in pool.size():
+		var want := QuizDatabase.TIERS.find(QuizDatabase.tier_for_round(n + 1))
+		for step in QuizDatabase.TIERS.size():
+			var picked := false
+			for t in [want - step, want + step]:
+				if t >= 0 and t < QuizDatabase.TIERS.size() and not queues[QuizDatabase.TIERS[t]].is_empty():
+					order.append(queues[QuizDatabase.TIERS[t]].pop_front())
+					picked = true
+					break
+			if picked:
+				break
+	_order_key = key
+	_order_cache = order
+	return order
 
 
 func question_count() -> int:

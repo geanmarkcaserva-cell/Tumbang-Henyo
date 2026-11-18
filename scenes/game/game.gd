@@ -111,10 +111,13 @@ var _correct_index := 0
 var _wind := Vector3.ZERO
 var _round_points := 0
 var _run_caps := 0
+var _run_correct := 0 ## right answers this run (custom quiz Records)
+var _run_asked := 0 ## questions answered or timed out this run
 var _tayas: Array = []
 var _lata_home := Vector3.ZERO
 var _tut: Tutorial ## only on a first run (until finished or skipped)
 var _leaves: Node3D
+var _dust: RunDust
 var _round_progress := 0.0 ## 0..1 through this round's slice of the clock
 var _round_clean := true ## no wrong answer or miss yet this round (bullseye still possible)
 var _bullseye: Node3D
@@ -194,7 +197,11 @@ func _ready() -> void:
 	_leaves.name = "WindLeaves"
 	_leaves.follow = _player
 	add_child(_leaves)
-	if not Economy.tutorial_done and PLAYTEST_START_ROUND <= 1 and not Lobby.in_match():
+	_dust = RunDust.new() # dust puffs behind running feet (you and the tayas)
+	_dust.name = "RunDust"
+	_dust.player = _player
+	add_child(_dust)
+	if (not Economy.tutorial_done or Settings.force_tutorials) and PLAYTEST_START_ROUND <= 1 and not Lobby.in_match():
 		_tut = Tutorial.new()
 		_tut.name = "Tutorial"
 		add_child(_tut)
@@ -222,6 +229,7 @@ func _ready() -> void:
 	var barangay := _barangay()
 	Sfx.start_loop("crickets", -30.0) # louder as it gets dark (_on_sky_tint)
 	_sky_cycle.tint_changed.connect(_leaves.set_tint)
+	_sky_cycle.tint_changed.connect(_dust.set_tint)
 	_sky_cycle.tint_changed.connect(_on_sky_tint)
 	_sky_cycle.setup($Arena/WorldEnvironment, $Arena/Sun, barangay.lamp_spots() if barangay else [])
 	_update_clock(true)
@@ -332,6 +340,9 @@ func _physics_process(_delta: float) -> void:
 		var b := _barangay()
 		if b:
 			b.unstick(_player)
+			for t in _tayas: # the tayas too (wedged in a house, they're put back out)
+				if t.state != t.State.FLEE and not t.is_gone(): # not the ones running home in Mama's round
+					b.unstick(t)
 
 
 func _process(delta: float) -> void:
@@ -358,7 +369,7 @@ func _report_class() -> void:
 
 ## The class's question arrived: ask it (same choice order as everyone else's
 ## screen and the teacher's), with however much time is left on it.
-func _on_class_question(index: int, seconds: float) -> void:
+func _on_class_question(index: int, _seconds: float) -> void:
 	if state != State.QUIZ or not _class_waiting:
 		return
 	var q := Lobby.class_question(index)
@@ -523,7 +534,7 @@ func _ensure_tayas() -> int:
 func _hook_taya(t: CharacterBody3D) -> void:
 	t.setup(_player, _lata)
 	t.lata_reset.connect(_on_taya_lata_reset)
-	t.tagged_player.connect(_on_tagged)
+	t.tagged_player.connect(_on_tagged.bind(t))
 	t.hit_player.connect(_on_hit_by_slipper.bind(t))
 	_tayas.append(t)
 
@@ -560,7 +571,9 @@ func _enter_quiz() -> void:
 		_hud.set_class_board_open(true) # standings while you wait
 		Lobby.ready_for_question()
 		return
-	_question = QuizDatabase.next_question(theme_id, QuizDatabase.tier_for_round(round_number))
+	# The tutorial's practice round always gets easy questions (rounds 1-5 too).
+	var tier := "easy" if _tutorial_on() else QuizDatabase.tier_for_round(round_number)
+	_question = QuizDatabase.next_question(theme_id, tier)
 	if _question.is_empty():
 		push_error("No questions found for theme '%s'" % theme_id)
 		return
@@ -577,6 +590,7 @@ func _ask_question(order: Array, seconds: float) -> void:
 		choices.append(_question.choices[i])
 	_correct_index = order.find(_question.answer)
 	_quiz.time_limit = seconds
+	_quiz.set_difficulty(String(_question.get("tier", "")))
 	_quiz.ask(_question.question, choices)
 	# Hints cost real tansan; none in the free practice round.
 	_quiz.set_hint(not _tutorial_on(), HINT_COST, Economy.caps >= HINT_COST)
@@ -591,6 +605,7 @@ func _on_quiz_answered(choice_index: int) -> void:
 		Lobby.send_answer(_class_q, _choice_order[choice_index], choice_index == _correct_index)
 		_class_q = -1
 	_quiz.show_result(choice_index, _correct_index, _question.explanation)
+	_count_answer(choice_index == _correct_index)
 	if _tutorial_on():
 		_tut.on_answer(choice_index == _correct_index)
 	if choice_index == _correct_index:
@@ -638,9 +653,44 @@ func _on_quiz_timed_out() -> void:
 		Lobby.send_answer(_class_q, -1, false)
 		_class_q = -1
 	_quiz.show_result(-1, _correct_index, _question.explanation)
+	_count_answer(false)
 	if _tutorial_on():
 		_tut.on_answer(false)
 	_answer_failed()
+
+
+func _count_answer(right: bool) -> void:
+	if _tutorial_on():
+		return # practice questions don't count
+	_run_asked += 1
+	if right:
+		_run_correct += 1
+
+
+## Custom quizzes are practice: no bottlecaps (made-up questions could farm them).
+func _caps_off() -> bool:
+	return CustomQuiz.is_custom(theme_id)
+
+
+## A custom quiz game ended ("home", "caught" or "left"): keep its score in
+## the set's Records (Custom quiz -> Records).
+func _record_custom(result: String, rounds_cleared: int) -> void:
+	if not CustomQuiz.is_custom(theme_id):
+		return
+	var in_class := theme_id == Lobby.quiz_theme and Lobby.in_match()
+	CustomRecords.add({
+		"set": theme_id.trim_prefix(CustomQuiz.THEME_PREFIX),
+		"title": GameManager.theme_name(theme_id),
+		"desc": CustomQuiz.desc_of(theme_id),
+		"player": GameManager.player_name,
+		"time": int(Time.get_unix_time_from_system()),
+		"score": score,
+		"rounds": maxi(rounds_cleared, 0),
+		"correct": _run_correct,
+		"asked": _run_asked,
+		"result": result,
+		"class": in_class,
+	})
 
 
 func _answer_failed() -> void:
@@ -673,7 +723,7 @@ func _enter_throw() -> void:
 	_hud.set_context("throw")
 	_hud.update_wind(_wind, _player.global_basis)
 	_leaves.set_wind(_wind)
-	_leaves.set_active(true)
+	_leaves.set_active(true, true) # while aiming: background leaves only
 	if _wind.length() > 0.05: # wind you can hear, stronger = louder
 		Sfx.fade_loop("wind", lerpf(-16.0, 0.0, clampf(_wind.length() / 6.0, 0.0, 1.0)), 0.8)
 	if _tutorial_on():
@@ -682,7 +732,7 @@ func _enter_throw() -> void:
 	else:
 		_hud.show_status("Correct! Knock down the can!")
 		if _wind.length() > 0.05 and Economy.first_time("wind"):
-			_hud.show_tip("Wind!", "The leaves show where it blows. Aim a little into it.", 6.0)
+			_hud.show_tip("Wind!", "Your aim line bends with the wind. The faint line is where it would go without it: aim into the wind.", 7.0)
 	_throw.begin(_player, _wind, _preview_for_round())
 
 
@@ -777,7 +827,7 @@ func _enter_run() -> void:
 	_set_player_mode(true, true)
 	_hud.show_throw_ui(false)
 	_hud.set_context("run")
-	_leaves.set_active(false)
+	_leaves.set_active(true) # the wind's leaves blow all around you now (gone at the next question)
 	_capture_mouse()
 	var practice := _tutorial_on()
 	if practice:
@@ -832,26 +882,41 @@ func _on_hit_by_slipper(from_taya: CharacterBody3D) -> void:
 	_hud.show_status("Ouch!" if practice else "Ouch! -%d Aura" % AWRA_SLIPPER_HIT)
 
 
-func _on_tagged() -> void:
+## GM and Ashiela catching each other: they dance this long under the pixel heart!
+## And when one makes it home, the other (a taya that round) cheers this long.
+const ROUND_CLEAR_CHEER := 3.5
+const SWEET_DANCE_TIME := 2.6
+
+
+func _on_tagged(by: Node = null) -> void:
 	if state != State.RUN:
 		return
 	_set_state(State.TAGGED)
 	_round_hurt = true
-	Sfx.play("tagged")
-	Sfx.play("voice_huli_ka")
+	# Caught by their other half (GM and Ashiela): a little dance, no "Huli ka!".
+	var sweet: bool = by != null and bool(by.get("smitten"))
+	if sweet:
+		Sfx.play("ui_equip")
+	else:
+		Sfx.play("tagged")
+		Sfx.play("voice_huli_ka")
 	_set_player_mode(false, false)
 	_hud.set_context("none")
 	_stop_tayas()
+	if sweet:
+		by.dance_with_player(SWEET_DANCE_TIME)
+		_player.celebrate(SWEET_DANCE_TIME)
 	var practice := _tutorial_on()
 	_lose_awra(AWRA_TAGGED)
 	if state == State.GAME_OVER:
 		return
+	var caught_text := "Caught by your other half!" if sweet else "Tagged!"
 	if practice:
-		_hud.show_status("Tagged!")
+		_hud.show_status(caught_text)
 		_tut.on_tagged()
 	else:
-		_hud.show_status("Tagged! -%d Aura" % AWRA_TAGGED)
-	await _wait(2.4 if practice else 1.8)
+		_hud.show_status("%s -%d Aura" % [caught_text, AWRA_TAGGED])
+	await _wait(SWEET_DANCE_TIME if sweet else (2.4 if practice else 1.8))
 	if state == State.TAGGED:
 		if practice:
 			_retry_throw()
@@ -874,6 +939,9 @@ func _round_clear() -> void:
 	_hud.set_context("none")
 	_stop_tayas()
 	_player.celebrate(-1.0) # until the next round respawns them
+	# GM and Ashiela: if your other half is a taya this round, they cheer you home!
+	for t in _tayas:
+		t.cheer_for_player(ROUND_CLEAR_CHEER)
 	Sfx.play("round_clear")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_round_achievements()
@@ -1009,8 +1077,11 @@ func _reset_field() -> void:
 
 
 func _add_caps(amount: int) -> void:
+	if _caps_off():
+		return
 	if amount > 0:
 		Sfx.play("coin", -3.0, 1.0, 0.05)
+		_hud.cap_burst(amount) # the caps fly into the counter
 	_run_caps += amount
 	Economy.add_caps(amount)
 
@@ -1045,7 +1116,9 @@ func _game_over(won: bool = false) -> void:
 	var rounds_cleared := round_number if won else round_number - 1
 	var rank := GameManager.submit_score(theme_id, score, rounds_cleared)
 	Economy.record_run(theme_id, score, rounds_cleared, won, perfect_shots, _run_seconds)
-	_hud.show_game_over(score, rounds_cleared, _run_caps, rank, GameManager.best_score(theme_id), won)
+	_record_custom("home" if won else "caught", rounds_cleared)
+	# Custom quizzes give no caps: -1 tells the card to say so.
+	_hud.show_game_over(score, rounds_cleared, -1 if _caps_off() else _run_caps, rank, GameManager.best_score(theme_id), won)
 	if Lobby.is_client():
 		_report_class() # final score, marked out
 		await get_tree().create_timer(0.6).timeout # let the board catch up
@@ -1161,7 +1234,7 @@ func _enter_mama_run() -> void:
 	_player.set_move_bounds(MAMA_AREA, true)
 	_hud.show_throw_ui(false)
 	_hud.set_context("run")
-	_leaves.set_active(false)
+	_leaves.set_active(true) # the wind's leaves blow all around you now (gone at the next question)
 	_capture_mouse()
 	_beacon.visible = true
 	_hud.set_beacon(_goal.centre, _player)
@@ -1404,7 +1477,7 @@ func _enter_tanod_run() -> void:
 	_player.set_move_bounds(MAMA_AREA, true)
 	_hud.show_throw_ui(false)
 	_hud.set_context("run")
-	_leaves.set_active(false)
+	_leaves.set_active(true) # the wind's leaves blow all around you now (gone at the next question)
 	_capture_mouse()
 	_beacon.visible = true
 	_hud.set_beacon(_goal.centre, _player)
@@ -1585,6 +1658,8 @@ func _resume() -> void:
 
 
 func _quit_to_menu() -> void:
+	if _run_asked > 0 and state != State.GAME_OVER:
+		_record_custom("left", round_number - 1) # left a custom game early: still a record
 	Economy.save_profile()
 	GameManager.go_to_main_menu()
 

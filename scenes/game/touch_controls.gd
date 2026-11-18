@@ -59,9 +59,11 @@ var _stick_pos := Vector2.ZERO ## where the joystick sits (see _layout)
 ## Layout editor mode: everything shows, drags move controls, nothing is sent
 ## to the game. `layout` / `scale_mult` are the editor's working copy.
 var editing := false
-var layout := {}
-var scale_mult := 1.0
+var layout := {} ## id -> position (fraction of the screen); "_sizes": id -> that control's own size
+var scale_mult := 1.0 ## the old all-controls size (kept for saved layouts; 1 by default)
 var _drag_id := ""
+var selected := "" ## editing: the control the Size slider resizes
+signal selection_changed(id: String)
 
 
 func _ready() -> void:
@@ -108,15 +110,16 @@ func _layout() -> void:
 	if s.x < 1.0 or s.y < 1.0:
 		return
 	var u := _unit()
-	var k := scale_mult
 	_buttons = {
-		"jump": {"pos": default_pos("jump", s), "r": 96 * u * k, "ctx": "run"},
-		"sprint": {"pos": default_pos("sprint", s), "r": 78 * u * k, "ctx": "run"},
-		"back": {"pos": default_pos("back", s), "r": 60 * u * k, "ctx": "run"},
-		"throw": {"pos": default_pos("throw", s), "r": 128 * u * k, "ctx": "throw"},
+		"jump": {"pos": default_pos("jump", s), "r": 96 * u * size_of("jump"), "ctx": "run"},
+		"sprint": {"pos": default_pos("sprint", s), "r": 78 * u * size_of("sprint"), "ctx": "run"},
+		"back": {"pos": default_pos("back", s), "r": 60 * u * size_of("back"), "ctx": "run"},
+		"throw": {"pos": default_pos("throw", s), "r": 128 * u * size_of("throw"), "ctx": "throw"},
 	}
 	_stick_pos = default_pos("stick", s)
 	for id in layout:
+		if not (layout[id] is Vector2):
+			continue # "_sizes"
 		var f: Vector2 = layout[id]
 		var p := Vector2(f.x * s.x, f.y * s.y)
 		if id == "stick":
@@ -142,9 +145,23 @@ func _unit() -> float:
 	return size.y / 1080.0
 
 
-## The joystick's base radius (grows with the size setting).
+## The joystick's base radius (grows with its size setting).
 func _stick_r() -> float:
-	return 120.0 * _unit() * scale_mult
+	return 120.0 * _unit() * size_of("stick")
+
+
+## One control's size (1 = normal): its own setting from the layout editor.
+func size_of(id: String) -> float:
+	var sizes: Dictionary = layout.get("_sizes", {})
+	return scale_mult * float(sizes.get(id, 1.0))
+
+
+## Editing: resize just this control.
+func set_control_size(id: String, k: float) -> void:
+	var sizes: Dictionary = (layout.get("_sizes", {}) as Dictionary).duplicate()
+	sizes[id] = k
+	layout["_sizes"] = sizes
+	_layout()
 
 
 ## Screen rect of a button (for the tutorial's highlight ring).
@@ -345,6 +362,8 @@ func _edit_input(event: InputEvent) -> void:
 		return
 	if pressed:
 		_drag_id = _control_at(pos)
+		if _drag_id != "" and _drag_id != selected:
+			select(_drag_id)
 	elif released:
 		_drag_id = ""
 	elif moved and _drag_id != "":
@@ -377,16 +396,23 @@ func set_editing_scale(k: float) -> void:
 	_layout()
 
 
+## Editing: pick the control the Size slider works on.
+func select(id: String) -> void:
+	selected = id
+	queue_redraw()
+	selection_changed.emit(id)
+
+
 func _draw_editing() -> void:
 	var u := _unit()
 	var f := UiKit.title_font()
 	var fs := int(28 * u)
-	_draw_stick_rest(Color(1, 0.8, 0.34, 0.9) if _drag_id == "stick" else Color(1, 1, 1, 0.75))
+	_draw_stick_rest(Color(1, 0.8, 0.34, 0.9) if _drag_id == "stick" or selected == "stick" else Color(1, 1, 1, 0.75))
 	_edit_label(f, fs, _stick_centre() + Vector2(0, _stick_r() + 30 * u), MOVABLE.stick)
 	for id in _buttons:
 		if _buttons[id].ctx != context:
 			continue # the editor shows the running or the throwing buttons
-		_draw_button(id, id == _drag_id)
+		_draw_button(id, id == _drag_id or id == selected)
 		var b: Dictionary = _buttons[id]
 		_edit_label(f, fs, b.pos + Vector2(0, b.r + 30 * u), MOVABLE[id])
 

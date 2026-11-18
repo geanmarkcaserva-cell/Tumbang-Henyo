@@ -51,6 +51,7 @@ static func source(av: Dictionary) -> Image:
 			var img := _image_of(sheet.texture)
 			if img == null:
 				return null
+			@warning_ignore("integer_division")
 			var fw := img.get_width() / maxi(int(sheet.frames), 1)
 			return img.get_region(Rect2i(0, 0, fw, img.get_height()))
 		"slipper":
@@ -157,7 +158,9 @@ static func _badge(col: Color, px: int, art: Image, fill: bool = false) -> Image
 	var h := maxi(int(art.get_height() * scale), 1)
 	var a := art.duplicate() as Image
 	a.resize(w, h, Image.INTERPOLATE_NEAREST if scale >= 1.0 else Image.INTERPOLATE_BILINEAR)
+	@warning_ignore("integer_division")
 	var ox := (px - w) / 2
+	@warning_ignore("integer_division")
 	var oy := (px - h) / 2
 	for y in h:
 		for x in w:

@@ -4,22 +4,21 @@
 [ext_resource type="PackedScene" uid="uid://1o50ergga4ke" path="res://scenes/game/quiz_panel.tscn" id="2_quiz"]
 [ext_resource type="Script" uid="uid://d4ai15eja8k15" path="res://scenes/game/power_gauge.gd" id="3_gauge"]
 
-[node name="HUD" type="CanvasLayer"]
+[node name="HUD" type="CanvasLayer" unique_id=1344031103]
 script = ExtResource("1_hud")
 
-[node name="Status" type="Label" parent="."]
+[node name="Status" type="Label" parent="." unique_id=1945187892]
 anchors_preset = 10
 anchor_right = 1.0
 offset_top = 300.0
 offset_bottom = 380.0
 grow_horizontal = 2
-mouse_filter = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 10
 theme_override_font_sizes/font_size = 48
 horizontal_alignment = 1
 
-[node name="ThrowUI" type="Control" parent="."]
+[node name="ThrowUI" type="Control" parent="." unique_id=1056941690]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -28,7 +27,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="PowerGauge" type="Control" parent="ThrowUI"]
+[node name="PowerGauge" type="Control" parent="ThrowUI" unique_id=253415063]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -44,4 +43,4 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_gauge")
 
-[node name="QuizPanel" parent="." instance=ExtResource("2_quiz")]
+[node name="QuizPanel" parent="." unique_id=1618644208 instance=ExtResource("2_quiz")]

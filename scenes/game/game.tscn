@@ -1,22 +1,22 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dxwjvayr6hut0"]
 
-[ext_resource type="Script" path="res://scenes/game/game.gd" id="1_game"]
-[ext_resource type="PackedScene" path="res://scenes/arenas/sk_court.tscn" id="2_arena"]
-[ext_resource type="PackedScene" path="res://scenes/game/player.tscn" id="3_player"]
-[ext_resource type="PackedScene" path="res://scenes/game/hud.tscn" id="4_hud"]
-[ext_resource type="Script" path="res://scenes/game/throw_controller.gd" id="5_throw"]
+[ext_resource type="Script" uid="uid://dy35r0y34twty" path="res://scenes/game/game.gd" id="1_game"]
+[ext_resource type="PackedScene" uid="uid://bmr6t7h0j7vth" path="res://scenes/arenas/sk_court.tscn" id="2_arena"]
+[ext_resource type="PackedScene" uid="uid://be0deexm8sye1" path="res://scenes/game/player.tscn" id="3_player"]
+[ext_resource type="PackedScene" uid="uid://c0jac8ixby1p4" path="res://scenes/game/hud.tscn" id="4_hud"]
+[ext_resource type="Script" uid="uid://chpliu4124g6n" path="res://scenes/game/throw_controller.gd" id="5_throw"]
 
-[node name="Game" type="Node3D"]
+[node name="Game" type="Node3D" unique_id=1943402177]
 script = ExtResource("1_game")
 
-[node name="Arena" parent="." instance=ExtResource("2_arena")]
+[node name="Arena" parent="." unique_id=1095793817 instance=ExtResource("2_arena")]
 
-[node name="Player" parent="." instance=ExtResource("3_player")]
+[node name="Player" parent="." unique_id=818444087 instance=ExtResource("3_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3)
 
-[node name="ThrowController" type="Node3D" parent="."]
+[node name="ThrowController" type="Node3D" parent="." unique_id=906642731]
 script = ExtResource("5_throw")
 
-[node name="Preview" type="MeshInstance3D" parent="ThrowController"]
+[node name="Preview" type="MeshInstance3D" parent="ThrowController" unique_id=774119537]
 
-[node name="HUD" parent="." instance=ExtResource("4_hud")]
+[node name="HUD" parent="." unique_id=2102451428 instance=ExtResource("4_hud")]

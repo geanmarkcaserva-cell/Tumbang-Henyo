@@ -1,7 +1,8 @@
 class_name SettingsPanel
 extends PanelContainer
 ## The settings card used by the main menu and the pause menu:
-## Volume, Music, SFX sliders, Low detail and Fullscreen switches, Back,
+## Volume, Music, SFX sliders, Quality (Low / Normal / High), Fullscreen and Force show all
+## tutorials switches, Back, Show all tutorials again,
 ## a Controls page to rebind keys (press a row, then the new key), and Touch
 ## buttons > Arrange to move and resize the on-screen controls.
 ## Everything applies right away and is saved by the Settings autoload.
@@ -11,6 +12,14 @@ signal back_pressed
 const ON_COLOR := Color(1.0, 0.86, 0.35)
 
 var _toggles := {}
+var _quality_buttons := {} ## "low" / "normal" / "high" -> button
+var _quality_hint: Label
+var _hud_buttons := {} ## "small" / "medium" / "large" -> button
+const QUALITY_HINTS := {
+	"low": "Fewer plants, no shadows, lower 3D resolution. Faster on phones.",
+	"normal": "Plants, shadows and full 3D resolution.",
+	"high": "Everything in Normal, plus light rays from the sun and moon.",
+}
 var _main: VBoxContainer
 var _controls: VBoxContainer
 var _key_buttons := {} ## action -> Button
@@ -22,7 +31,7 @@ func _init() -> void:
 	add_theme_stylebox_override("panel", UiKit.box(UiKit.PANEL_DARK, Color(0.3, 0.3, 0.32), 10, 8))
 	custom_minimum_size = Vector2(860, 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 22)
+	v.add_theme_constant_override("separation", 12) # tight: it has to fit the pause menu too
 	add_child(v)
 	_main = v
 	_build_controls()
@@ -34,9 +43,8 @@ func _init() -> void:
 	v.add_child(_slider_row("Volume", Settings.volume, Settings.set_volume))
 	v.add_child(_slider_row("Music", Settings.music, Settings.set_music))
 	v.add_child(_slider_row("SFX", Settings.sfx, Settings.set_sfx, true))
-	v.add_child(_toggle_row("Low detail mode", "low", Settings.low_detail,
-			func(on: bool): Settings.set_low_detail(on),
-			"Fewer plants, no shadows, lower 3D resolution. Faster on phones."))
+	v.add_child(_quality_row())
+	v.add_child(_hud_size_row())
 	if Settings.can_fullscreen():
 		v.add_child(_toggle_row("Fullscreen", "full", Settings.fullscreen,
 				func(on: bool): Settings.set_fullscreen(on)))
@@ -50,10 +58,14 @@ func _init() -> void:
 		var kl := UiKit.title("Controls", 42, Color.WHITE, 8)
 		kl.custom_minimum_size = Vector2(450, 0)
 		keys.add_child(kl)
-		var remap := UiKit.button("Remap keys", UiKit.BLUE, 32, Vector2(300, 76))
-		remap.pressed.connect(func(): _show_controls(true))
-		keys.add_child(remap)
+		var remap_btn := UiKit.button("Remap keys", UiKit.BLUE, 32, Vector2(300, 76))
+		remap_btn.pressed.connect(func(): _show_controls(true))
+		keys.add_child(remap_btn)
 		v.add_child(keys)
+
+	v.add_child(_toggle_row("Force show all tutorials", "force_tut", Settings.force_tutorials,
+			func(on: bool): Settings.set_force_tutorials(on),
+			"Every tutorial and tip shows each time, even ones you closed."))
 
 	# Touch buttons: move and resize the on-screen controls (phones, or PC with touch on).
 	var touch_row := HBoxContainer.new()
@@ -72,14 +84,16 @@ func _init() -> void:
 	var back := UiKit.button("Back", UiKit.BLUE, 40, Vector2(240, 96))
 	back.pressed.connect(func(): back_pressed.emit())
 	bottom.add_child(back)
-	# Plays the guided first round again on the next game.
-	var replay := UiKit.button("Replay tutorial", UiKit.BLUE, 40, Vector2(400, 96))
-	replay.disabled = not Economy.tutorial_done
+	# Brings back every tutorial: the guided first round (next game), the
+	# one-time tips and the tours closed with "Don't show again".
+	var replay := UiKit.button("Show all tutorials again", UiKit.BLUE, 36, Vector2(520, 96))
+	replay.disabled = not Economy.tutorial_done and Economy.tips_seen.is_empty()
 	replay.pressed.connect(func():
 		Economy.tutorial_done = false
 		Economy.tips_seen.clear()
+		CustomTutorial.shown_this_session = false
 		Economy.save_profile()
-		replay.text = "Plays next game"
+		replay.text = "Tutorials are back!"
 		replay.disabled = true
 		UiFx.bounce(replay, 1.1))
 	bottom.add_child(replay)
@@ -201,7 +215,7 @@ func _label_of(action: String) -> String:
 func refresh() -> void:
 	if _toggles.has("full"):
 		_set_toggle(_toggles.full, Settings.fullscreen)
-	_set_toggle(_toggles.low, Settings.low_detail)
+	_set_quality_buttons()
 
 
 func _slider_row(text: String, value: float, setter: Callable, preview_sfx: bool = false) -> Control:
@@ -228,6 +242,61 @@ func _slider_row(text: String, value: float, setter: Callable, preview_sfx: bool
 	if preview_sfx:
 		slider.drag_ended.connect(func(_changed: bool): Sfx.play("coin"))
 	return row
+
+
+## Quality: Low / Normal / High, with the chosen one in gold.
+func _quality_row() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	var name_label := UiKit.title("Quality", 42, Color.WHITE, 8)
+	name_label.custom_minimum_size = Vector2(250, 0)
+	row.add_child(name_label)
+	for q in [["low", "Low"], ["normal", "Normal"], ["high", "High"]]:
+		var b := UiKit.button(q[1], UiKit.BLUE, 32, Vector2(180, 76))
+		b.pressed.connect(func():
+			Settings.set_quality(q[0])
+			_set_quality_buttons()
+			_quality_hint.text = QUALITY_HINTS[q[0]]
+			UiFx.bounce(b, 1.12))
+		row.add_child(b)
+		_quality_buttons[q[0]] = b
+	_quality_hint = UiKit.label(QUALITY_HINTS[Settings.quality()], 22, Color(1, 1, 1, 0.6))
+	box.add_child(_quality_hint)
+	_set_quality_buttons()
+	return box
+
+
+## HUD size: Small / Medium / Large (the in-game HUD; applies straight away).
+func _hud_size_row() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var name_label := UiKit.title("HUD size", 42, Color.WHITE, 8)
+	name_label.custom_minimum_size = Vector2(250, 0)
+	row.add_child(name_label)
+	for s in [["small", "Small"], ["medium", "Medium"], ["large", "Large"]]:
+		var b := UiKit.button(s[1], UiKit.BLUE, 32, Vector2(180, 76))
+		b.pressed.connect(func():
+			Settings.set_hud_size(s[0])
+			_set_hud_buttons()
+			UiFx.bounce(b, 1.12))
+		row.add_child(b)
+		_hud_buttons[s[0]] = b
+	_set_hud_buttons()
+	return row
+
+
+func _set_hud_buttons() -> void:
+	for key in _hud_buttons:
+		UiKit.set_fill(_hud_buttons[key], UiKit.GOLD if key == Settings.hud_size else UiKit.BLUE, false)
+
+
+func _set_quality_buttons() -> void:
+	var now := Settings.quality()
+	for key in _quality_buttons:
+		UiKit.set_fill(_quality_buttons[key], UiKit.GOLD if key == now else UiKit.BLUE, false)
 
 
 func _toggle_row(text: String, key: String, on: bool, setter: Callable, hint: String = "") -> Control:

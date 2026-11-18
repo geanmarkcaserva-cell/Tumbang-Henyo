@@ -15,6 +15,7 @@ var _by_theme := {} # theme id -> Array of question dictionaries
 ## Question id -> true once asked. Kept across runs (and saved) so a theme's
 ## whole bank is gone through before any question comes back.
 var _used := {}
+var _last_id := "" ## the question asked last (never asked twice in a row)
 
 
 func _ready() -> void:
@@ -67,28 +68,33 @@ func next_question(theme: String, tier: String = "") -> Dictionary:
 	var pool: Array = _by_theme.get(theme, [])
 	if pool.is_empty():
 		return {}
-	var unused := pool.filter(func(q): return not _used.has(q.id))
-	if unused.is_empty():
-		# The whole bank has been asked: start it over.
-		for q in pool:
-			_used.erase(q.id)
-		unused = pool.duplicate()
-	# The asked tier first, then the nearest one that still has new questions.
-	var candidates: Array = []
+	# Only the asked tier, so rounds 1-5 always get easy questions. Only a
+	# theme with none of that tier at all borrows from the nearest tier.
+	var tier_pool: Array = pool
 	var want := TIERS.find(tier)
-	if want < 0:
-		candidates = unused
-	else:
+	if want >= 0:
+		tier_pool = []
 		for step in TIERS.size():
 			for t in [want - step, want + step]:
-				if t >= 0 and t < TIERS.size() and candidates.is_empty():
-					candidates = unused.filter(func(q): return q.tier == TIERS[t])
-			if not candidates.is_empty():
+				if t >= 0 and t < TIERS.size() and tier_pool.is_empty():
+					tier_pool = pool.filter(func(q): return q.tier == TIERS[t])
+			if not tier_pool.is_empty():
 				break
-		if candidates.is_empty():
-			candidates = unused
-	var question: Dictionary = candidates.pick_random()
+		if tier_pool.is_empty():
+			tier_pool = pool
+	var unused := tier_pool.filter(func(q): return not _used.has(q.id))
+	if unused.is_empty():
+		# Every question of this tier has been asked: start the tier over
+		# (instead of jumping to harder ones too early).
+		for q in tier_pool:
+			_used.erase(q.id)
+		unused = tier_pool.duplicate()
+		# ...but not the one just asked, so it can't come straight back.
+		if unused.size() > 1:
+			unused = unused.filter(func(q): return q.id != _last_id)
+	var question: Dictionary = unused.pick_random()
 	_used[question.id] = true
+	_last_id = question.id
 	_save_seen()
 	return question
 

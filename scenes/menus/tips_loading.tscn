@@ -1,8 +1,8 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://db4cned2wrwf4"]
 
-[ext_resource type="Script" path="res://scenes/menus/tips_loading.gd" id="1_tips"]
+[ext_resource type="Script" uid="uid://bngwtvfp3cleb" path="res://scenes/menus/tips_loading.gd" id="1_tips"]
 
-[node name="TipsLoading" type="Control"]
+[node name="TipsLoading" type="Control" unique_id=549085639]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

@@ -108,6 +108,7 @@ material = SubResource("mat_line")
 
 [node name="CircleOuter" type="CSGCylinder3D" parent="Geometry" unique_id=445692430]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.035, -20)
+visible = false
 radius = 0.65
 height = 0.02
 sides = 24
@@ -115,6 +116,7 @@ material = SubResource("mat_line")
 
 [node name="CircleInner" type="CSGCylinder3D" parent="Geometry" unique_id=2063397219]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, -20)
+visible = false
 radius = 0.57
 height = 0.02
 sides = 24

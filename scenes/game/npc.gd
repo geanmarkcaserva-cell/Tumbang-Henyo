@@ -233,20 +233,20 @@ func _pick_door(map: RID) -> Dictionary:
 		return {}
 	var near := []
 	for h in _barangay.house_boxes():
-		var c: Vector3 = h.centre
-		if _flat(c - global_position).length() < ROAM + 8.0 and MAP.has_point(Vector2(c.x, c.z)):
+		var hc: Vector3 = h.centre
+		if _flat(hc - global_position).length() < ROAM + 8.0 and MAP.has_point(Vector2(hc.x, hc.z)):
 			near.append(h)
 	if near.is_empty():
 		return {}
 	var h: Dictionary = near.pick_random()
 	var c: Vector3 = h.centre
-	var basis: Basis = (h.basis as Basis).orthonormalized()
+	var rot: Basis = (h.basis as Basis).orthonormalized()
 	var half: Vector2 = h.half
 	var best := {}
 	var best_d := INF
 	for side: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
 		var reach := (half.x if side.x != 0.0 else half.y) + 0.7
-		var want := c + basis * side * reach
+		var want := c + rot * side * reach
 		var q := NavigationServer3D.map_get_closest_point(map, want)
 		if q.y > NAV_GROUND or _flat(q - want).length() > 0.9:
 			continue

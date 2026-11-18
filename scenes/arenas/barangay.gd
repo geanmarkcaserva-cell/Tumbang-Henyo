@@ -4,8 +4,9 @@ extends Node3D
 ## barangay_layout.json (written by the scripts in art/source/).
 ##
 ## Plants are drawn as one MultiMesh per plant type, so thousands of grass
-## clumps cost about the same as one. Small plants fade out with distance and
-## cast no shadows (cheap on phones).
+## clumps cost about the same as one (small plants: one per plant type per
+## 12 m map tile, so each tile fades out with its own distance). Small plants
+## fade out with distance and cast no shadows (cheap on phones).
 ##
 ## Forced perspective: houses and trees far from the court are built bigger,
 ## so the barangay feels deeper than it is.
@@ -47,6 +48,10 @@ var lamppost_bulbs: Array = []
 ## The glowing bulb material (DayNight turns it on at dusk).
 var bulb_material: StandardMaterial3D
 var _house_rects: Array = [] ## [centre, half, basis] of every walkable house
+
+## Small plants (grass, ferns, bushes) are batched per map tile this size
+## (metres), so each tile fades in and out on its own.
+const PLANT_TILE := 12.0
 
 @export var small_plant_fade_start := 30.0 ## metres from the camera
 @export var small_plant_fade_end := 40.0
@@ -158,7 +163,7 @@ func _drop_pieces_in_houses(arrays: Array, xf: Transform3D) -> Variant:
 			join.call(i, same[key])
 		else:
 			same[key] = i
-	for t in idx.size() / 3:
+	for t in int(idx.size() / 3.0):
 		join.call(idx[t * 3], idx[t * 3 + 1])
 		join.call(idx[t * 3], idx[t * 3 + 2])
 	var boxes := {}
@@ -177,7 +182,7 @@ func _drop_pieces_in_houses(arrays: Array, xf: Transform3D) -> Variant:
 	if drop.is_empty():
 		return null
 	var kept := PackedInt32Array()
-	for t in idx.size() / 3:
+	for t in int(idx.size() / 3.0):
 		if not drop.has(find.call(idx[t * 3])):
 			kept.append(idx[t * 3])
 			kept.append(idx[t * 3 + 1])
@@ -270,35 +275,56 @@ func _build_plants(layout: Dictionary) -> void:
 			continue
 		if plant_name in ps1:
 			mesh = _ps1_mesh(mesh)
+		var material: Material = _card_material(mesh) if plant_name in cards else null
 		var entries: Array = all_plants[plant_name]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = mesh
-		mm.instance_count = entries.size()
-		var grows: bool = plant_name in grow
-		for i in entries.size():
-			var e: Dictionary = entries[i]
-			var p: Array = e.p
-			var s := float(e.s)
-			if grows:
-				var d := Vector2(p[0], p[2]).distance_to(COURT_CENTRE)
-				s *= clampf(1.0 + (d - tree_growth_start) * tree_growth_per_metre, 1.0, tree_growth_max)
-			var b := Basis(Vector3.UP, float(e.ry)).scaled(Vector3.ONE * s)
-			mm.set_instance_transform(i, Transform3D(b, Vector3(p[0], p[1], p[2])))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = plant_name
-		mmi.multimesh = mm
 		if plant_name in small:
-			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			mmi.visibility_range_begin = 0.0
-			mmi.visibility_range_end = small_plant_fade_end
-			mmi.visibility_range_end_margin = small_plant_fade_end - small_plant_fade_start
-			mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
-		if plant_name in cards:
-			mmi.material_override = _card_material(mesh)
-		if plant_name in small or plant_name in cards:
-			mmi.add_to_group("detail_heavy") # hidden in low detail mode (Settings)
-		add_child(mmi)
+			# Fading small plants go in map tiles: a MultiMesh fades by the
+			# distance to its *middle*, so one map-wide batch would vanish
+			# completely once you're ~40 m from the court.
+			var tiles := {}
+			for e in entries:
+				var key := Vector2i(floori(float(e.p[0]) / PLANT_TILE), floori(float(e.p[2]) / PLANT_TILE))
+				if not tiles.has(key):
+					tiles[key] = []
+				tiles[key].append(e)
+			for key in tiles:
+				_add_plant_batch("%s_%d_%d" % [plant_name, key.x, key.y], mesh, tiles[key], plant_name in grow, true, material)
+		else:
+			_add_plant_batch(plant_name, mesh, entries, plant_name in grow, false, material)
+
+
+## One MultiMesh batch of a plant type. small = cheap: fades out with distance, no
+## shadows, hidden in low detail mode.
+func _add_plant_batch(batch_name: String, mesh: Mesh, entries: Array, grows: bool, small: bool, material: Material) -> void:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = entries.size()
+	for i in entries.size():
+		var e: Dictionary = entries[i]
+		var p: Array = e.p
+		var s := float(e.s)
+		if grows:
+			var d := Vector2(p[0], p[2]).distance_to(COURT_CENTRE)
+			s *= clampf(1.0 + (d - tree_growth_start) * tree_growth_per_metre, 1.0, tree_growth_max)
+		var b := Basis(Vector3.UP, float(e.ry)).scaled(Vector3.ONE * s)
+		mm.set_instance_transform(i, Transform3D(b, Vector3(p[0], p[1], p[2])))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = batch_name
+	mmi.multimesh = mm
+	if small:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_begin = 0.0
+		# The range is measured to the tile's middle: add half a tile so
+		# clumps at its far edge still show out to the fade distance.
+		mmi.visibility_range_end = small_plant_fade_end + PLANT_TILE * 0.71
+		mmi.visibility_range_end_margin = small_plant_fade_end - small_plant_fade_start
+		mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	if material:
+		mmi.material_override = material
+	if small or material:
+		mmi.add_to_group("detail_heavy") # hidden in low detail mode (Settings)
+	add_child(mmi)
 
 
 ## PS1 look for the trees and spiky grass: blocky (nearest) texture filtering,
@@ -371,19 +397,19 @@ func build_cores() -> void:
 	var space := get_world_3d().direct_space_state
 	for h in house_boxes():
 		var half: Vector2 = h.half
-		var basis: Basis = (h.basis as Basis).orthonormalized()
+		var rot: Basis = (h.basis as Basis).orthonormalized()
 		var c: Vector3 = h.centre
 		# The eaves: the lowest bit of roof just inside the four corners.
 		var top := INF
 		for sx: float in [-1.0, 1.0]:
 			for sz: float in [-1.0, 1.0]:
-				var pt: Vector3 = c + basis * Vector3(sx * (half.x - 0.4), 0.0, sz * (half.y - 0.4))
+				var pt: Vector3 = c + rot * Vector3(sx * (half.x - 0.4), 0.0, sz * (half.y - 0.4))
 				var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(pt + Vector3.UP * 20.0, pt + Vector3.UP * 0.3))
 				if not hit.is_empty() and hit.collider == solid:
 					top = minf(top, (hit.position as Vector3).y)
 		if top == INF or top < 1.4:
 			continue
-		_cores.append({"centre": c, "half": half, "basis": basis, "inv": basis.transposed(), "top": top,
+		_cores.append({"centre": c, "half": half, "basis": rot, "inv": rot.transposed(), "top": top,
 			"reach": half.length() + 1.0})
 	_cores_ready = true
 
@@ -407,11 +433,11 @@ func house_core_at(feet: Vector3) -> Dictionary:
 		var up := space.intersect_ray(PhysicsRayQueryParameters3D.create(probe, probe + Vector3.UP * 12.0))
 		if up.is_empty() or up.collider != solid:
 			return {} # open sky above: on top of the roof, fine
-		var basis: Basis = k.basis
+		var rot: Basis = k.basis
 		var hit: Array[bool] = []
 		for dir: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
 			var reach := (half.x if dir.x != 0.0 else half.y) * 2.0 + 0.6
-			hit.append(_hits(space, probe, probe + basis * dir * reach, solid))
+			hit.append(_hits(space, probe, probe + rot * dir * reach, solid))
 		if not hit.has(false):
 			return k
 		# Under the roof but on top of the walls: the low roof space, open at
@@ -439,7 +465,7 @@ func unstick(body: CharacterBody3D) -> bool:
 	if k.is_empty():
 		return false
 	var c: Vector3 = k.centre
-	var basis: Basis = k.basis
+	var rot: Basis = k.basis
 	var local: Vector3 = (k.inv as Basis) * (feet - c)
 	var half: Vector2 = k.half
 	var space := get_world_3d().direct_space_state
@@ -451,7 +477,7 @@ func unstick(body: CharacterBody3D) -> bool:
 	else:
 		var out := _nearest_side(local, half)
 		var spot: Vector3 = local * Vector3(absf(out.z), 0.0, absf(out.x)) + out * (absf(out.dot(Vector3(half.x, 0.0, half.y))) + 0.55)
-		var p: Vector3 = c + basis * spot
+		var p: Vector3 = c + rot * spot
 		body.global_position = Vector3(p.x, maxf(feet.y, 0.05), p.z)
 	body.velocity = Vector3(0.0, minf(body.velocity.y, 0.0), 0.0)
 	return true
@@ -614,7 +640,7 @@ static func _chain_link_texture() -> Texture2D:
 
 
 ## Adds a box (centre, size, turn) to a SurfaceTool mesh.
-static func _add_box(st: SurfaceTool, centre: Vector3, size: Vector3, basis: Basis) -> void:
+static func _add_box(st: SurfaceTool, centre: Vector3, size: Vector3, rot: Basis) -> void:
 	var h := size * 0.5
 	var faces := [
 		[Vector3.RIGHT, Vector3.UP, Vector3.BACK], [Vector3.LEFT, Vector3.UP, Vector3.FORWARD],
@@ -629,9 +655,9 @@ static func _add_box(st: SurfaceTool, centre: Vector3, size: Vector3, basis: Bas
 		var e1 := t1 * h
 		var e2 := t2 * h
 		var quad := [c - e1 - e2, c - e1 + e2, c + e1 + e2, c - e1 - e2, c + e1 + e2, c + e1 - e2]
-		st.set_normal(basis * n)
+		st.set_normal(rot * n)
 		for q in quad:
-			st.add_vertex(centre + basis * q)
+			st.add_vertex(centre + rot * q)
 
 
 # --- Street lamps --------------------------------------------------------------------

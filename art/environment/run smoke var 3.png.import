@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://hxrag3eab3hm"
-path="res://.godot/imported/Untitled1010_20261021145543.png-8c7ae0f38ed878d31794d73f90187af8.ctex"
+uid="uid://bau6ptomwv8mc"
+path="res://.godot/imported/run smoke var 3.png-bd8afbc9f54d077f2f8ce8158131d78b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Credits/Untitled1010_20261021145543.png"
-dest_files=["res://.godot/imported/Untitled1010_20261021145543.png-8c7ae0f38ed878d31794d73f90187af8.ctex"]
+source_file="res://art/environment/run smoke var 3.png"
+dest_files=["res://.godot/imported/run smoke var 3.png-bd8afbc9f54d077f2f8ce8158131d78b.ctex"]
 
 [params]
 
@@ -37,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

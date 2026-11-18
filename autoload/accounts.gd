@@ -14,8 +14,8 @@ signal changed ## an account was created, switched, renamed or deleted
 
 const LIST_PATH := "user://accounts.cfg"
 const ROOT := "user://accounts/"
-const MAX_ACCOUNTS := 5
-const NAME_MAX := 16
+const MAX_ACCOUNTS := 10
+const NAME_MAX := 18
 ## Badge colours, picked in turn for new accounts (changeable: set_color).
 const COLORS := [Color(0.98, 0.72, 0.25), Color(0.4, 0.75, 1.0), Color(0.55, 0.9, 0.5),
 		Color(1.0, 0.5, 0.6), Color(0.75, 0.6, 1.0)]
@@ -84,8 +84,8 @@ func path_of(id: String, file: String) -> String:
 # --- Changes ------------------------------------------------------------------------
 
 ## A clean, unique name, or "" if it's empty. Returns the error to show, or "".
-func check_name(name: String, ignore_id: String = "") -> String:
-	var n := clean_name(name)
+func check_name(account_name: String, ignore_id: String = "") -> String:
+	var n := clean_name(account_name)
 	if n == "":
 		return "Type a name first."
 	for a in _accounts:
@@ -94,21 +94,21 @@ func check_name(name: String, ignore_id: String = "") -> String:
 	return ""
 
 
-static func clean_name(name: String) -> String:
-	return name.strip_edges().substr(0, NAME_MAX)
+static func clean_name(account_name: String) -> String:
+	return account_name.strip_edges().substr(0, NAME_MAX)
 
 
 ## Make a new account and switch to it. Returns its id ("" if not allowed).
-func create(name: String) -> String:
+func create(account_name: String) -> String:
 	_ensure()
-	if not can_create() or check_name(name) != "":
+	if not can_create() or check_name(account_name) != "":
 		return ""
 	var first := _accounts.is_empty()
 	var id := "acc%d_%d" % [Time.get_unix_time_from_system(), randi() % 10000]
 	DirAccess.make_dir_recursive_absolute(ROOT + id)
 	if first:
 		_adopt_old_saves(id) # progress from before accounts goes to the first one
-	_accounts.append({"id": id, "name": clean_name(name),
+	_accounts.append({"id": id, "name": clean_name(account_name),
 			"created": int(Time.get_unix_time_from_system()),
 			"color": COLORS[_accounts.size() % COLORS.size()]})
 	_save_list()
@@ -116,12 +116,12 @@ func create(name: String) -> String:
 	return id
 
 
-func rename(id: String, name: String) -> bool:
-	if check_name(name, id) != "":
+func rename(id: String, account_name: String) -> bool:
+	if check_name(account_name, id) != "":
 		return false
 	for a in _accounts:
 		if a.id == id:
-			a.name = clean_name(name)
+			a.name = clean_name(account_name)
 	_save_list()
 	changed.emit()
 	return true

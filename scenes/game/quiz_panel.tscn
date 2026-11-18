@@ -30,7 +30,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 80.0
-offset_top = -340.0
+offset_top = -430.0
 offset_right = -80.0
 offset_bottom = -40.0
 grow_horizontal = 2
@@ -44,7 +44,7 @@ theme_override_constants/separation = 48
 [node name="Left" type="VBoxContainer" parent="Panel/HBox" unique_id=1903175596]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.3
+size_flags_stretch_ratio = 1.05
 theme_override_constants/separation = 12
 
 [node name="Header" type="Label" parent="Panel/HBox/Left" unique_id=1405603252]
@@ -77,35 +77,35 @@ autowrap_mode = 3
 [node name="Choices" type="VBoxContainer" parent="Panel/HBox" unique_id=1040173234]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 14
+theme_override_constants/separation = 18
 alignment = 1
 
 [node name="ChoiceA" type="Button" parent="Panel/HBox/Choices" unique_id=1755687678]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 68)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
 focus_mode = 0
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 36
 text = "a)  Choice"
 alignment = 1
 autowrap_mode = 3
 
 [node name="ChoiceB" type="Button" parent="Panel/HBox/Choices" unique_id=244670066]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 68)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
 focus_mode = 0
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 36
 text = "b)  Choice"
 alignment = 1
 autowrap_mode = 3
 
 [node name="ChoiceC" type="Button" parent="Panel/HBox/Choices" unique_id=2040415785]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 68)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
 focus_mode = 0
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 36
 text = "c)  Choice"
 alignment = 1
 autowrap_mode = 3

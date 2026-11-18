@@ -1,215 +1,219 @@
 extends Node3D
-## Leaves blowing across the court in windy rounds, so players can read the
-## wind at a glance: they drift the way it blows, faster and in bigger numbers
-## the stronger it is, tumbling and fluttering as they go.
+## Leaves blowing through the whole barangay in windy rounds, so players can
+## read the wind at a glance: they drift the way it blows, faster and in
+## bigger numbers the stronger it is, tumbling and fluttering as they go.
 ##
-## Drawn with one MultiMesh (cheap on phones); the leaf is a small built-in
-## mesh, no texture. They live in a box in front of the player (between them
-## and the lata), and a leaf that drifts out is re-blown in from the upwind side.
+## Like a volume of particles: the leaves fill the map from street level up
+## to the rooftops, gusts roll through them along the wind, and one that blows
+## off the edge of the map comes back in on the other side. Leaves that end
+## their life fade out and new ones fade in somewhere else (half of them
+## around you, so the air near you is never empty).
+##
+## When they show:
+## - throw: background only. Half as many, and none near you, so nothing
+##   flutters between you and the lata while you aim.
+## - run: all of them, near you too, until the next question.
+## - quiz: hidden. Low detail mode (Settings): never.
+##
+## The leaves are the two pixel-art leaves in art/sk_court ("Leaf var 1/2",
+## exported from the .aseprite files next to them), drawn as flat cards, one
+## MultiMesh per picture (a few hundred leaves cost about two draw calls).
 
-const MAX_LEAVES := 64
+const LEAF_TEXTURES := [
+	preload("res://art/sk_court/Leaf var 1.png"),
+	preload("res://art/sk_court/Leaf var 2.png"),
+]
+## Where the leaf sits on its 20x20 canvas (pixels): the card shows only this.
+const LEAF_RECT := Rect2(7, 5, 6, 9)
+const CANVAS := 20.0
+
+const MAP_RECT := Rect2(-68.0, -88.0, 136.0, 146.0) ## the fenced map (same as Barangay)
+const LOW := 0.8 ## leaves fly between these heights (metres)
+const HIGH := 10
+const MIN_LEAVES := 100 ## in a light breeze...
+const MAX_LEAVES := 450 ## ...up to this many in the strongest wind
 const MAX_WIND := 6.0 ## m/s, the strongest wind the rounds roll
-const COLOURS := [Color(0.48, 0.74, 0.25), Color(0.73, 0.76, 0.26), Color(0.8, 0.52, 0.22), Color(0.6, 0.66, 0.2), Color(0.86, 0.66, 0.3)]
-const HALF := Vector3(9.0, 0.0, 10.0) ## half extents of the box (side, -, depth)
-const LOW := 0.4 ## leaves fly between these heights (the band you look through when aiming)
-const HIGH := 3.6
-
-var wind := Vector3.ZERO
-var follow: Node3D ## the player: the box sits in front of them
-
+## Throw view: no leaves closer to you than CLEAR_NEAR (fading in by CLEAR_FAR).
+const CLEAR_NEAR := 10.0
+const CLEAR_FAR := 16.0
+const NEAR_SHARE := 0.5 ## of new leaves start within NEAR_RADIUS of you...
+const NEAR_RADIUS := 35.0 ## ...and the rest anywhere on the map
+const CAMERA_CLEAR := 2.5 ## leaves this close to the camera fade out (no giant leaf in your face)
+## Light tints over the leaf's own colours: fresh, sun-dried and autumn ones.
+const COLOURS := [Color(1, 1, 1), Color(1, 1, 1), Color(1.0, 0.95, 0.75), Color(1.0, 0.8, 0.6), Color(0.9, 1.0, 0.85)]
 const BASE_TINT := Color(0.92, 0.92, 0.92)
 
-var _mat: StandardMaterial3D
-var _leaves: Array = []
-var _mm := MultiMesh.new()
+var wind := Vector3.ZERO
+var follow: Node3D ## the player (the throw view keeps leaves away from them)
+
+var _mats: Array[StandardMaterial3D] = []
+var _mms: Array[MultiMesh] = [] ## one per leaf picture
+# One entry per leaf (packed arrays: a few hundred leaves stay cheap).
+var _pos := PackedVector3Array()
+var _axis := PackedVector3Array()
+var _col := PackedColorArray()
+var _spin := PackedFloat32Array()
+var _angle := PackedFloat32Array()
+var _phase := PackedFloat32Array()
+var _size := PackedFloat32Array()
+var _speed := PackedFloat32Array()
+var _age := PackedFloat32Array()
+var _life := PackedFloat32Array()
+var _pic := PackedInt32Array()
 var _fade := 0.0 ## 0..1, all leaves together (fade in/out with the wind)
 var _target_fade := 0.0
+var _bg := 0.0 ## 0..1: how far into the throw view (background leaves only)
+var _target_bg := 0.0
 var _time := 0.0
 
 
 func _ready() -> void:
-	_mm.transform_format = MultiMesh.TRANSFORM_3D
-	_mm.use_colors = true
-	_mm.mesh = _leaf_mesh()
-	_mm.instance_count = MAX_LEAVES
-	_mm.visible_instance_count = 0
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = _mm
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mmi.extra_cull_margin = 60.0
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	# Unlit: a leaf seen from behind against the sun would otherwise turn into a
-	# dark blob. The two-tone halves and the tumbling still give it shape.
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = BASE_TINT
-	mmi.material_override = mat
-	_mat = mat
-	add_child(mmi)
 	top_level = true
+	var card := QuadMesh.new() # the leaf's own shape (6x9 px), 1 unit tall
+	card.size = Vector2(LEAF_RECT.size.x / LEAF_RECT.size.y, 1.0)
+	for tex in LEAF_TEXTURES:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = card
+		mm.instance_count = MAX_LEAVES
+		mm.visible_instance_count = 0
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.custom_aabb = AABB(Vector3(MAP_RECT.position.x, 0.0, MAP_RECT.position.y) - Vector3.ONE * 2.0,
+				Vector3(MAP_RECT.size.x, HIGH, MAP_RECT.size.y) + Vector3.ONE * 4.0)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = tex
+		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST # crisp pixels
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		mat.alpha_scissor_threshold = 0.5
+		mat.vertex_color_use_as_albedo = true
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		# Only the leaf part of the canvas.
+		mat.uv1_scale = Vector3(LEAF_RECT.size.x / CANVAS, LEAF_RECT.size.y / CANVAS, 1.0)
+		mat.uv1_offset = Vector3(LEAF_RECT.position.x / CANVAS, LEAF_RECT.position.y / CANVAS, 0.0)
+		# Unlit: a leaf seen from behind against the sun would otherwise turn
+		# into a dark blob.
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = BASE_TINT
+		mmi.material_override = mat
+		_mats.append(mat)
+		_mms.append(mm)
+		add_child(mmi)
+	_pos.resize(MAX_LEAVES)
+	_axis.resize(MAX_LEAVES)
+	_col.resize(MAX_LEAVES)
+	_spin.resize(MAX_LEAVES)
+	_angle.resize(MAX_LEAVES)
+	_phase.resize(MAX_LEAVES)
+	_size.resize(MAX_LEAVES)
+	_speed.resize(MAX_LEAVES)
+	_age.resize(MAX_LEAVES)
+	_life.resize(MAX_LEAVES)
+	_pic.resize(MAX_LEAVES)
+	for i in MAX_LEAVES:
+		_new_leaf(i)
+		_age[i] = randf() * _life[i] # mid-life, so they don't all fade in together
 
 
 ## The leaves are unlit, so the day/night cycle darkens them by hand.
 func set_tint(c: Color) -> void:
-	if _mat:
-		_mat.albedo_color = Color(BASE_TINT.r * c.r, BASE_TINT.g * c.g, BASE_TINT.b * c.b)
+	for m in _mats:
+		m.albedo_color = Color(BASE_TINT.r * c.r, BASE_TINT.g * c.g, BASE_TINT.b * c.b)
 
 
 ## New wind for this throw. Zero wind: the leaves settle away.
 func set_wind(w: Vector3) -> void:
 	wind = Vector3(w.x, 0.0, w.z)
-	_target_fade = 1.0 if wind.length() > 0.05 else 0.0
-	if _target_fade > 0.0 and _leaves.is_empty():
-		_spawn_all()
+	if wind.length() <= 0.05:
+		_target_fade = 0.0
 
 
-## Hide (quiz, run) or show (throw) the leaves.
-func set_active(on: bool) -> void:
+## Show the leaves (throw: background_only, run: all) or hide them (quiz).
+func set_active(on: bool, background_only: bool = false) -> void:
 	_target_fade = 1.0 if on and wind.length() > 0.05 else 0.0
-	if _target_fade > 0.0 and _leaves.is_empty():
-		_spawn_all()
+	_target_bg = 1.0 if background_only else 0.0
 
 
-func _count() -> int:
-	var k := clampf(wind.length() / MAX_WIND, 0.0, 1.0)
-	var n := int(lerpf(22.0, MAX_LEAVES, k))
-	if Settings.low_detail:
-		n = int(n * 0.5)
-	return n
-
-
-func _centre() -> Vector3:
-	if follow == null:
-		return Vector3.ZERO
-	var fwd := -follow.global_basis.z
-	fwd.y = 0.0
-	fwd = fwd.normalized() if fwd.length() > 0.01 else Vector3.FORWARD
-	return follow.global_position + fwd * 7.0
-
-
-func _spawn_all() -> void:
-	_leaves.clear()
-	var c := _centre()
-	for i in _count():
-		var leaf := _new_leaf()
-		leaf.pos = c + Vector3(randf_range(-HALF.x, HALF.x), 0.0, randf_range(-HALF.z, HALF.z))
-		leaf.pos.y = randf_range(LOW, HIGH)
-		leaf.age = randf() * leaf.life # start mid-life so they don't all pop in together
-		_leaves.append(leaf)
-
-
-func _new_leaf() -> Dictionary:
-	return {
-		"pos": Vector3.ZERO,
-		"axis": Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)).normalized(),
-		"spin": randf_range(2.0, 6.0) * (1.0 if randf() < 0.5 else -1.0),
-		"angle": randf() * TAU,
-		"phase": randf() * TAU,
-		"size": randf_range(0.34, 0.52),
-		"speed": randf_range(0.75, 1.25),
-		"colour": COLOURS[randi() % COLOURS.size()],
-		"age": 0.0,
-		"life": randf_range(4.0, 7.5),
-	}
-
-
-## Put a leaf back in on the upwind side of the box.
-func _respawn(leaf: Dictionary) -> void:
-	var c := _centre()
-	var dir := wind.normalized() if wind.length() > 0.01 else Vector3.RIGHT
-	var side := Vector3(-dir.z, 0.0, dir.x)
-	var reach := absf(dir.x) * HALF.x + absf(dir.z) * HALF.z
-	leaf.pos = c - dir * reach * randf_range(0.6, 1.0) + side * randf_range(-HALF.x, HALF.x)
-	leaf.pos.y = randf_range(LOW, HIGH)
-	leaf.age = 0.0
-	leaf.life = randf_range(4.0, 7.5)
+## A fresh leaf in the map's air: half of them somewhere around you (where
+## you can see them), the rest anywhere on the map.
+func _new_leaf(i: int) -> void:
+	var y := LOW + (HIGH - LOW) * pow(randf(), 1.6) # more of them low down
+	if follow and randf() < NEAR_SHARE:
+		var c := follow.global_position
+		var at := Vector2(c.x, c.z) + Vector2.from_angle(randf() * TAU) * NEAR_RADIUS * sqrt(randf())
+		at.x = clampf(at.x, MAP_RECT.position.x, MAP_RECT.end.x)
+		at.y = clampf(at.y, MAP_RECT.position.y, MAP_RECT.end.y)
+		_pos[i] = Vector3(at.x, y, at.y)
+	else:
+		_pos[i] = Vector3(randf_range(MAP_RECT.position.x, MAP_RECT.end.x), y,
+				randf_range(MAP_RECT.position.y, MAP_RECT.end.y))
+	_axis[i] = Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)).normalized()
+	_spin[i] = randf_range(2.0, 6.0) * (1.0 if randf() < 0.5 else -1.0)
+	_angle[i] = randf() * TAU
+	_phase[i] = randf() * TAU
+	_size[i] = randf_range(0.2, 0.3)
+	_speed[i] = randf_range(0.75, 1.25)
+	_col[i] = COLOURS[randi() % COLOURS.size()]
+	_pic[i] = randi() % LEAF_TEXTURES.size()
+	_age[i] = 0.0
+	_life[i] = randf_range(6.0, 12.0)
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	_fade = move_toward(_fade, _target_fade, delta * 1.5)
+	var off := Settings.low_detail
+	_fade = move_toward(_fade, 0.0 if off else _target_fade, delta * 1.2)
+	_bg = move_toward(_bg, _target_bg, delta * 2.0)
 	if _fade <= 0.0:
-		_mm.visible_instance_count = 0
-		if _target_fade <= 0.0:
-			_leaves.clear()
+		for mm in _mms:
+			mm.visible_instance_count = 0
 		return
-	var want := _count()
-	while _leaves.size() < want:
-		var leaf := _new_leaf()
-		_respawn(leaf)
-		_leaves.append(leaf)
-	if _leaves.size() > want:
-		_leaves.resize(want)
-	# Gusts: the visual wind breathes a little around the real value.
-	var gust := 1.0 + 0.25 * sin(_time * 0.9) + 0.12 * sin(_time * 2.3)
-	var c := _centre()
-	var dir := wind.normalized()
+	var k := clampf(wind.length() / MAX_WIND, 0.0, 1.0)
+	var count := int(lerpf(MIN_LEAVES, MAX_LEAVES, k))
+	var dir := wind.normalized() if wind.length() > 0.01 else Vector3.RIGHT
 	var side := Vector3(-dir.z, 0.0, dir.x)
-	var reach := absf(dir.x) * HALF.x + absf(dir.z) * HALF.z
-	for i in _leaves.size():
-		var leaf: Dictionary = _leaves[i]
-		leaf.age += delta
-		var t: float = _time + leaf.phase
-		var v: Vector3 = wind * gust * leaf.speed
+	var cam := get_viewport().get_camera_3d()
+	var eye := cam.global_position if cam else Vector3(0, 1000, 0)
+	var me := follow.global_position if follow else Vector3(0, 1000, 0)
+	var used: Array[int] = []
+	used.resize(_mms.size())
+	used.fill(0)
+	for i in count:
+		_age[i] += delta
+		if _age[i] > _life[i]:
+			_new_leaf(i)
+		var p := _pos[i]
+		var t := _time + _phase[i]
+		# Gusts roll through the volume along the wind.
+		var gust := 1.0 + 0.3 * sin(_time * 0.9 - p.dot(dir) * 0.06) + 0.12 * sin(t * 2.3)
+		var v := wind * gust * _speed[i]
 		v += side * sin(t * 1.7) * 0.6 # sway across the wind
 		v.y = sin(t * 2.4) * 0.5 - 0.08 # bob, slowly sinking
-		if leaf.pos.y < LOW:
+		if p.y < LOW:
 			v.y = absf(v.y) + 0.3 # skim back up off the ground
-		leaf.pos += v * delta
-		leaf.angle += leaf.spin * delta * (0.6 + 0.4 * gust)
-		var rel: Vector3 = leaf.pos - c
-		var along := rel.dot(dir)
-		if leaf.age > leaf.life or along > reach or absf(rel.dot(side)) > HALF.x * 1.3:
-			_respawn(leaf)
-		# Grow in, shrink out (and with the overall fade).
-		var life_k: float = minf(leaf.age / 0.6, 1.0) * minf((leaf.life - leaf.age) / 0.8, 1.0)
-		var s: float = leaf.size * clampf(life_k, 0.0, 1.0) * _fade
-		var b := Basis(leaf.axis, leaf.angle) * Basis(Vector3.UP, leaf.phase)
-		b = b.scaled(Vector3.ONE * maxf(s, 0.001))
-		_mm.set_instance_transform(i, Transform3D(b, leaf.pos))
-		_mm.set_instance_color(i, leaf.colour)
-	_mm.visible_instance_count = _leaves.size()
-
-
-## A small leaf in the XY plane, 1 unit long: two halves (light / dark) with a
-## pointed tip, and a short stem.
-static func _leaf_mesh() -> ArrayMesh:
-	var verts := PackedVector3Array()
-	var cols := PackedColorArray()
-	var steps := 10
-	var outline_l: Array[Vector3] = []
-	var outline_r: Array[Vector3] = []
-	for k in steps + 1:
-		var t := float(k) / steps
-		var y := lerpf(-0.5, 0.5, t)
-		var w := pow(sin(PI * t), 0.85) * (0.55 + 0.45 * (1.0 - t)) * 0.32
-		outline_l.append(Vector3(-w, y, 0.0))
-		outline_r.append(Vector3(w, y, 0.0))
-	for k in steps:
-		var a := Vector3(0, lerpf(-0.5, 0.5, float(k) / steps), 0)
-		var b := Vector3(0, lerpf(-0.5, 0.5, float(k + 1) / steps), 0)
-		# Left half (slightly darker), right half (lighter); a tiny fold in z.
-		for tri in [[a, outline_l[k], outline_l[k + 1]], [a, outline_l[k + 1], b]]:
-			for p in tri:
-				verts.append(p + Vector3(0, 0, -absf(p.x) * 0.25))
-				cols.append(Color(0.82, 0.82, 0.82))
-		for tri in [[a, outline_r[k + 1], outline_r[k]], [a, b, outline_r[k + 1]]]:
-			for p in tri:
-				verts.append(p + Vector3(0, 0, -absf(p.x) * 0.25))
-				cols.append(Color(1, 1, 1))
-	# Stem.
-	for p in [Vector3(-0.015, -0.5, 0), Vector3(0.015, -0.5, 0), Vector3(0.0, -0.66, 0)]:
-		verts.append(p)
-		cols.append(Color(0.6, 0.6, 0.6))
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_COLOR] = cols
-	var normals := PackedVector3Array()
-	normals.resize(verts.size())
-	normals.fill(Vector3(0, 0, 1))
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
+		p += v * delta
+		# Blown off one side of the map: back in on the other.
+		p.x = MAP_RECT.position.x + fposmod(p.x - MAP_RECT.position.x, MAP_RECT.size.x)
+		p.z = MAP_RECT.position.y + fposmod(p.z - MAP_RECT.position.y, MAP_RECT.size.y)
+		p.y = minf(p.y, HIGH)
+		_pos[i] = p
+		_angle[i] += _spin[i] * delta * (0.6 + 0.4 * gust)
+		# Size: grow in, shrink out, the overall fade, and the view rules.
+		var s := _size[i] * _fade * clampf(minf(_age[i] / 0.8, 1.0) * minf((_life[i] - _age[i]) / 1.0, 1.0), 0.0, 1.0)
+		if _bg > 0.0:
+			var away := Vector2(p.x - me.x, p.z - me.z).length()
+			var keep := smoothstep(CLEAR_NEAR, CLEAR_FAR, away) * (0.0 if i % 2 else 1.0)
+			s *= lerpf(1.0, keep, _bg)
+		s *= smoothstep(1.0, CAMERA_CLEAR, p.distance_to(eye))
+		if s < 0.01:
+			continue
+		var b := Basis(_axis[i], _angle[i]) * Basis(Vector3.UP, _phase[i])
+		var pic := _pic[i]
+		var slot := used[pic]
+		used[pic] = slot + 1
+		_mms[pic].set_instance_transform(slot, Transform3D(b.scaled(Vector3.ONE * s), p))
+		_mms[pic].set_instance_color(slot, _col[i])
+	for m in _mms.size():
+		_mms[m].visible_instance_count = used[m]

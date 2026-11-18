@@ -3,7 +3,8 @@ extends Node
 ## a little past). Moves the sun down and warms it, then dims it to a cool
 ## moonlight; shifts the sky from golden hour through a deep orange sunset
 ## and blue hour to night; darkens the ambient light and fog to match; and
-## switches the street-post lamps on as it gets dark.
+## switches the street-post lamps on as it gets dark. The sun and then the
+## moon are drawn in the sky where the light comes from (SkyBodies).
 ##
 ## Works on copies of the court's Environment and sky, so the main menu
 ## (same court scene) keeps its golden-hour look.
@@ -41,6 +42,23 @@ const KEYS := [
 		"tint": Color(0.15, 0.17, 0.28)},
 ]
 
+## The clouds run on their own, faster timeline, after the sunset photos: a
+## dark body with a glowing rim on the side facing the sun. The bodies turn
+## dusty purple, then slate, then black well before the sky is dark; the rims
+## glow gold, then orange, then red-pink, and fade out. At night the rims pick
+## up a faint moonlit blue. [t, body, lit rim], same t as KEYS.
+const CLOUD_KEYS := [
+	[0.0, Color(0.86, 0.82, 0.86), Color(1.0, 0.9, 0.7)], # 5:00 soft lavender, cream-gold edges
+	[0.25, Color(0.7, 0.6, 0.66), Color(1.0, 0.72, 0.38)], # 5:15 mauve, gold
+	[0.42, Color(0.46, 0.36, 0.46), Color(1.0, 0.55, 0.25)], # 5:25 dusty purple, orange
+	[0.58, Color(0.26, 0.2, 0.3), Color(0.98, 0.4, 0.3)], # 5:35 slate, red-orange / pink
+	[0.75, Color(0.12, 0.1, 0.15), Color(0.6, 0.2, 0.22)], # 5:45 dark, crimson embers
+	[0.9, Color(0.07, 0.065, 0.09), Color(0.22, 0.1, 0.13)], # nearly black
+	[1.0, Color(0.055, 0.055, 0.075), Color(0.1, 0.09, 0.12)], # 6:00 black shapes
+	[NIGHT_T, Color(0.04, 0.045, 0.065), Color(0.16, 0.18, 0.26)], # night: moonlit edges
+	[MAX_T, Color(0.035, 0.04, 0.06), Color(0.14, 0.16, 0.24)],
+]
+
 ## Unlit things (the wind leaves) don't react to the sun, so they take this
 ## colour instead: white-ish by day, dim blue at night.
 signal tint_changed(tint: Color)
@@ -56,6 +74,7 @@ var _lamps: Array[OmniLight3D] = []
 var _bulbs: Array[StandardMaterial3D] = []
 var _t := 0.0
 var _target := 0.0
+var _bodies: SkyBodies ## the sun / moon in the sky (and High quality light rays)
 
 
 ## world_env/sun from the court; posts = where to hang the lamps (may be empty).
@@ -64,6 +83,10 @@ func setup(world_env: WorldEnvironment, sun: DirectionalLight3D, posts: Array) -
 	world_env.environment = _env
 	_sky = _env.sky.sky_material as ProceduralSkyMaterial if _env.sky else null
 	_sun = sun
+	_bodies = SkyBodies.new()
+	_bodies.name = "SkyBodies"
+	_bodies.light = sun
+	add_child(_bodies)
 	var fwd := -sun.global_basis.z
 	_sun_yaw = atan2(fwd.x, fwd.z)
 	_base_elev = rad_to_deg(asin(clampf(-fwd.y, -1.0, 1.0))) # 5 PM starts exactly as the court was lit
@@ -148,7 +171,15 @@ func _apply(t: float) -> void:
 		var elev := deg_to_rad(lerpf(elev_a, b.elev, k))
 		var dir := Vector3(sin(_sun_yaw) * cos(elev), -sin(elev), cos(_sun_yaw) * cos(elev))
 		_sun.global_basis = Basis.looking_at(dir, Vector3.UP)
+	if _bodies:
+		# The sun until about 6 PM, then the moon.
+		_bodies.night = smoothstep(0.92, 1.12, t)
+		_bodies.sun_tint = a.sun.lerp(b.sun, k) if t < 1.0 else KEYS[1].sun
 	tint = a.tint.lerp(b.tint, k)
+	if _bodies:
+		var cloud := _cloud_colours(t)
+		_bodies.cloud_body = cloud[0]
+		_bodies.cloud_lit = cloud[1]
 	tint_changed.emit(tint)
 	var lamp := smoothstep(LAMPS_ON_T - 0.02, LAMPS_ON_T + 0.04, t)
 	for l in _lamps:
@@ -156,3 +187,15 @@ func _apply(t: float) -> void:
 		l.light_energy = lamp * 2.2
 	for m in _bulbs:
 		m.emission_energy_multiplier = lamp * 4.0
+
+
+## The clouds' [body, lit rim] colours at time t (CLOUD_KEYS, eased between keys).
+func _cloud_colours(t: float) -> Array:
+	var last: Array = CLOUD_KEYS[CLOUD_KEYS.size() - 1]
+	for i in CLOUD_KEYS.size() - 1:
+		var a: Array = CLOUD_KEYS[i]
+		var b: Array = CLOUD_KEYS[i + 1]
+		if t <= b[0]:
+			var k := smoothstep(a[0], b[0], t)
+			return [(a[1] as Color).lerp(b[1], k), (a[2] as Color).lerp(b[2], k)]
+	return [last[1], last[2]]

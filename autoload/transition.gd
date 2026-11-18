@@ -12,6 +12,7 @@ extends CanvasLayer
 const FADE_TIME := 0.35
 
 var _rect: ColorRect
+var _loading: Label ## "Loading..." on the black while the next screen is built
 var _tween: Tween
 var _busy := false
 
@@ -24,6 +25,15 @@ func _ready() -> void:
 	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_rect)
+	_loading = UiKit.title("Loading...", 44, Color.WHITE, 0)
+	_loading.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_loading.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_loading.offset_left = -520
+	_loading.offset_top = -110
+	_loading.offset_right = -60
+	_loading.offset_bottom = -50
+	_loading.visible = false
+	_rect.add_child(_loading)
 	fade_in(0.6)
 
 
@@ -48,6 +58,12 @@ func change_scene(target: Variant) -> void:
 		return
 	_busy = true
 	await fade_out()
+	# Building the next screen can take a few seconds on a phone (the menu's
+	# court, the game's neighbourhood): say so, rather than a plain black
+	# screen that looks frozen. Drawn once before the build starts.
+	_loading.visible = true
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
 	get_tree().paused = false
 	var err: Error
 	if target is PackedScene:
@@ -59,6 +75,7 @@ func change_scene(target: Variant) -> void:
 	# Let the new scene run _ready and draw a frame before revealing it.
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_loading.visible = false
 	await fade_in()
 	_busy = false
 

@@ -19,6 +19,14 @@ const GAME := "res://scenes/game/game.tscn"
 const BOARD_PATH := "user://leaderboard.cfg"
 const BOARD_SIZE := 7
 
+func _ready() -> void:
+	# Every list that scrolls gets finger scrolling (drag on buttons, glide,
+	# thick bars) for phones: see TouchScroll.
+	get_tree().node_added.connect(func(n: Node):
+		if n is ScrollContainer:
+			(func(): if is_instance_valid(n) and n.is_inside_tree(): TouchScroll.attach(n)).call_deferred())
+
+
 var selected_theme := "history"
 ## Where the trailer goes when it ends (set by the boot screen: the main menu,
 ## already loaded).

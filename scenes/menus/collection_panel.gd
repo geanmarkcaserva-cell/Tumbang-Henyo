@@ -13,7 +13,6 @@ signal back_pressed
 var _count: Label
 var _row: HBoxContainer
 var _footer: Label
-var _cards: Array = []
 var _grid: GridContainer
 var _sub: Label
 var _tab := "items"
@@ -155,7 +154,7 @@ func _shop_card(it: Dictionary, mine: bool, character: bool) -> Control:
 		var tex: Texture2D = sheet.texture
 		var at := AtlasTexture.new()
 		at.atlas = tex
-		var fw := tex.get_width() / maxi(int(sheet.frames), 1)
+		var fw := tex.get_width() / float(maxi(int(sheet.frames), 1))
 		at.region = Rect2(0, 0, fw, tex.get_height())
 		pic.texture = at
 	else:
@@ -421,9 +420,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## The real (placeholder) 3D model turning on a little stand, in its own
 ## small world so the menu's court doesn't light it.
-func _turntable(it: Dictionary, size: Vector2 = Vector2(286, 250)) -> Control:
+func _turntable(it: Dictionary, box_size: Vector2 = Vector2(286, 250)) -> Control:
 	var box := SubViewportContainer.new()
-	box.custom_minimum_size = size
+	box.custom_minimum_size = box_size
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.stretch = true
 	var vp := SubViewport.new()

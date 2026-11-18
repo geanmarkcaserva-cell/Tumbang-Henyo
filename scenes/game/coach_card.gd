@@ -22,11 +22,15 @@ extends PanelContainer
 ##     "title_color": Color(...),
 ## })
 ## nice() swaps the card to a green tick and "Nice!" when a step is done.
+##
+## The player's own character stands on the card's top edge as the one
+## saying it (idle sheet; happy on "Nice!"). No extra actors here, just them.
 
 signal button_pressed(id: String)
 signal skip_pressed
 
 const GOOD := Color(0.45, 0.95, 0.55)
+const NICE_TIME := 1.3 ## seconds the green "Nice!" stays up before the next card
 const SIDE_WIDTH := 820.0
 
 var _box: StyleBoxFlat
@@ -37,7 +41,6 @@ var _check: Control
 var _title: Label
 var _body: Label
 var _keys: HBoxContainer
-var _points: BoxContainer
 var _points_holder: Control
 var _note: Label
 var _footer: HBoxContainer
@@ -46,6 +49,9 @@ var _skip: Button
 var _shown := false
 var _centered := false
 var _tween: Tween
+var _speaker: SpriteActor
+const SPEAKER_H := 190.0
+const SPEAKER_SPOT := Vector2(-110, 10) ## feet, from the card's top-right corner
 
 
 func _init() -> void:
@@ -131,7 +137,37 @@ func _init() -> void:
 	_footer.add_child(_skip)
 
 
+func _ready() -> void:
+	_speaker = SpriteActor.of(Economy.equipped_character, SPEAKER_H)
+	_speaker.name = "CoachSpeaker"
+	_speaker.process_mode = process_mode
+	_speaker.visible = false
+	get_parent().add_child.call_deferred(_speaker)
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(_speaker) and _speaker.get_parent() != self:
+		_speaker.queue_free()
+
+
+## Keep the speaker standing on the card through its pops and bounces.
+func _process(_delta: float) -> void:
+	if not is_instance_valid(_speaker) or not _speaker.is_inside_tree():
+		return
+	_speaker.visible = visible and modulate.a > 0.01
+	if not _speaker.visible:
+		return
+	var local := Vector2(size.x, 0.0) + SPEAKER_SPOT
+	_speaker.position = position + pivot_offset + (local - pivot_offset) * scale
+	_speaker.scale = scale
+	_speaker.modulate.a = modulate.a
+
+
 func show_card(d: Dictionary) -> void:
+	if is_instance_valid(_speaker):
+		_speaker.set_character(Economy.equipped_character)
+		if _speaker.state != "happy":
+			_speaker.play("idle")
 	_centered = d.get("center", false)
 	var width: float = d.get("width", 1100.0 if _centered else SIDE_WIDTH)
 	var inner := width - _box.content_margin_left - _box.content_margin_right
@@ -206,6 +242,8 @@ func show_card(d: Dictionary) -> void:
 ## A step was done: green tick, "Nice!", a little bounce. await it to wait.
 func nice(text: String = "Nice!") -> Signal:
 	Sfx.play("ui_equip") # tutorial step done: a bright little "ding-ding"
+	if is_instance_valid(_speaker):
+		_speaker.cheer(0.9)
 	_check.visible = true
 	_title.text = text
 	_title.add_theme_color_override("font_color", GOOD)
@@ -214,7 +252,7 @@ func nice(text: String = "Nice!") -> Signal:
 	_note.visible = false
 	_place.call_deferred()
 	UiFx.bounce(self, 1.05, 0.45)
-	return get_tree().create_timer(0.75, false).timeout
+	return get_tree().create_timer(NICE_TIME, false).timeout
 
 
 func hide_card() -> void:
@@ -268,7 +306,11 @@ func _place(open_after: bool = false) -> void:
 
 ## Welcome / done: numbered (or icon) columns side by side, or icon rows.
 func _build_points(points: Array, layout: String, inner: float) -> void:
-	var box: BoxContainer = HBoxContainer.new() if layout == "columns" else VBoxContainer.new()
+	var box: BoxContainer
+	if layout == "columns":
+		box = HBoxContainer.new()
+	else:
+		box = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 26 if layout == "columns" else 18)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE

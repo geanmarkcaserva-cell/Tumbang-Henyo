@@ -1,6 +1,8 @@
 extends Control
 ## Pinoy Henyo quiz panel: one question, three choices, a countdown.
 ## Answer by clicking/tapping a choice or pressing 1/2/3.
+## The choices are big tap targets (104 px tall, a wide column) so they're
+## easy to hit with a thumb on a phone.
 
 signal answered(choice_index: int)
 signal timed_out
@@ -12,6 +14,14 @@ var _hint_btn: Button
 var _hint_used := false
 var _tick_shown := -1 ## last whole second that ticked
 var _hint_cost := 100
+var _tier_chip: Label ## "Easy" / "Medium" / "Hard" next to the "Question" caption
+
+## The difficulty chip's colours.
+const TIER_LOOK := {
+	"easy": {"text": "Easy", "color": Color(0.24, 0.66, 0.36)},
+	"medium": {"text": "Medium", "color": Color(0.9, 0.6, 0.14)},
+	"hard": {"text": "Hard", "color": Color(0.84, 0.22, 0.24)},
+}
 
 @export var time_limit := 15.0
 
@@ -42,6 +52,46 @@ func _ready() -> void:
 		_buttons[i].add_theme_constant_override("shadow_offset_y", 2)
 		UiFx.hookup_button(_buttons[i])
 	_build_hint()
+	_build_tier_chip()
+
+
+## The difficulty chip, on the same line as the "Question" caption. It's part
+## of the quiz card, so it only shows while a question is up.
+func _build_tier_chip() -> void:
+	var header: Label = $Panel/HBox/Left/Header
+	var left: VBoxContainer = $Panel/HBox/Left
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	left.add_child(row)
+	left.move_child(row, header.get_index())
+	header.reparent(row)
+	_tier_chip = Label.new()
+	_tier_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_tier_chip.add_theme_font_size_override("font_size", 24)
+	_tier_chip.add_theme_color_override("font_color", Color.WHITE)
+	_tier_chip.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
+	_tier_chip.add_theme_constant_override("shadow_offset_y", 2)
+	UiKit.use_title_font(_tier_chip)
+	_tier_chip.visible = false
+	row.add_child(_tier_chip)
+
+
+## Show this question's difficulty ("easy", "medium" or "hard"; anything
+## else hides the chip).
+func set_difficulty(tier: String) -> void:
+	var look: Dictionary = TIER_LOOK.get(tier.to_lower(), {})
+	_tier_chip.visible = not look.is_empty()
+	if look.is_empty():
+		return
+	_tier_chip.text = look.text
+	var box := StyleBoxFlat.new()
+	box.bg_color = look.color
+	box.set_corner_radius_all(14)
+	box.content_margin_left = 16
+	box.content_margin_right = 16
+	box.content_margin_top = 4
+	box.content_margin_bottom = 4
+	_tier_chip.add_theme_stylebox_override("normal", box)
 
 
 ## "Hint" with a bottle cap and the price, under the timer.

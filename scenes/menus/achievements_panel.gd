@@ -69,7 +69,7 @@ func _is_mobile() -> bool:
 func _fat_scrollbar(bar: VScrollBar, width: int) -> void:
 	var track := StyleBoxFlat.new()
 	track.bg_color = Color(1, 1, 1, 0.08)
-	track.set_corner_radius_all(width / 2)
+	track.set_corner_radius_all(width >> 1)
 	track.content_margin_left = width / 2.0
 	track.content_margin_right = width / 2.0
 	bar.add_theme_stylebox_override("scroll", track)
@@ -77,7 +77,7 @@ func _fat_scrollbar(bar: VScrollBar, width: int) -> void:
 	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
 		var g := StyleBoxFlat.new()
 		g.bg_color = UiKit.ACCENT if state != "grabber" else Color(UiKit.ACCENT, 0.75)
-		g.set_corner_radius_all(width / 2)
+		g.set_corner_radius_all(width >> 1)
 		g.content_margin_left = width / 2.0
 		g.content_margin_right = width / 2.0
 		g.content_margin_top = width / 2.0

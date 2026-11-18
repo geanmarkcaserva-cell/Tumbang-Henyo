@@ -2,6 +2,10 @@ extends Node3D
 ## Handles one tsinelas throw: hold `throw` to charge (the gauge swings
 ## up and down), release to launch. While charging, a thick dashed preview
 ## shows the flight path and a circle marks where the tsinelas will land.
+## The path bends with the wind (it's the real flight, wind included); in a
+## wind, a faint straight line and ring show where it would go without it,
+## and the dashes turn the wind dial's colour, so you can see how much to
+## aim into it.
 
 signal power_changed(value: float)
 signal thrown
@@ -13,14 +17,17 @@ const TSINELAS_SCENE := preload("res://scenes/game/tsinelas.tscn")
 @export var max_speed := 24.0
 @export var elevation_deg := 25.0 ## added on top of the camera pitch
 @export var charge_cycles_per_sec := 0.8 ## full low-high-low swings per second
-@export var wind_factor := 0.6 ## wind (m/s) -> sideways acceleration (m/s^2)
+@export var wind_factor := 1.3 ## wind (m/s) -> sideways acceleration (m/s^2)
 @export var preview_step := 0.03
 @export var preview_max_time := 3.0
 
 const DASH_WIDTH := 0.09 ## metres
 const DASH_COLOR := Color(1.0, 0.86, 0.2, 0.95)
 const DASH_OUTLINE := Color(0.12, 0.05, 0.02, 0.75)
-const LANDING_RADIUS := 0.55
+const LANDING_RADIUS := 1
+const WIND_BREEZE := Color(0.55, 0.9, 1.0) ## same colours as the wind dial
+const WIND_STRONG := Color(1.0, 0.55, 0.35)
+const WIND_SHOWN := 0.4 ## m/s^2 of wind push before the path takes the wind's colour
 
 var active := false
 var power := 0.0
@@ -126,32 +133,10 @@ func _draw_preview() -> void:
 	_preview_mesh.clear_surfaces()
 	var p: Vector3 = _player.get_throw_origin()
 	var v := _launch_velocity()
-	var a := Vector3(0.0, -_gravity, 0.0) + _wind_accel()
-	var points: Array[Vector3] = [p]
-	var landing := Vector3.ZERO
-	var landing_normal := Vector3.UP
-	var landed := false
-	var space := get_world_3d().direct_space_state
-	var exclude: Array[RID] = [(_player as CollisionObject3D).get_rid()]
-	var t := 0.0
-	while t < preview_max_time:
-		t += preview_step
-		var next := p + v * t + 0.5 * a * t * t
-		# Stop where the flight path meets the ground, a wall or the lata.
-		var q := PhysicsRayQueryParameters3D.create(points[-1], next)
-		q.exclude = exclude
-		var hit := space.intersect_ray(q)
-		if not hit.is_empty():
-			points.append(hit.position)
-			landing = hit.position
-			landing_normal = hit.normal
-			landed = true
-			break
-		points.append(next)
-		if next.y <= 0.0:
-			landing = Vector3(next.x, 0.0, next.z)
-			landed = true
-			break
+	var gravity := Vector3(0.0, -_gravity, 0.0)
+	var push := _wind_accel()
+	var path := _trace(p, v, gravity + push)
+	var points: Array = path.points
 	var count := points.size()
 	if preview_fraction < 1.0:
 		count = maxi(int(points.size() * preview_fraction), 2)
@@ -159,19 +144,54 @@ func _draw_preview() -> void:
 		return
 	var cam := get_viewport().get_camera_3d()
 	var eye := cam.global_position if cam else p + Vector3(0, 2, 3)
+	var windy := push.length() > WIND_SHOWN
 	_preview_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Dashes: a dark outline under a bright core, both camera-facing ribbons.
+	# The path (only this one: no faint no-wind ghost). In a wind the dashes shade from gold to the wind dial's
+	# colour (cyan breeze, orange gale) as the push builds up along the flight.
+	var wind_col := WIND_BREEZE.lerp(WIND_STRONG, clampf((push.length() - 2.0) / 5.0, 0.0, 1.0))
 	for pass_i in 2:
 		var width := DASH_WIDTH * (1.8 if pass_i == 0 else 1.0)
-		var col := DASH_OUTLINE if pass_i == 0 else DASH_COLOR
 		for i in range(0, count - 1, 2):
+			var col := DASH_OUTLINE
+			if pass_i == 1:
+				col = DASH_COLOR.lerp(wind_col, float(i) / count * 0.85) if windy else DASH_COLOR
 			_ribbon(points[i], points[i + 1], eye, width, col)
 	# Where the tsinelas will land.
-	if landed and (preview_fraction >= 1.0 or count >= points.size()):
-		_ring(landing + landing_normal * 0.04, landing_normal, LANDING_RADIUS + 0.05, 0.13, DASH_OUTLINE)
-		_ring(landing + landing_normal * 0.05, landing_normal, LANDING_RADIUS, 0.07, DASH_COLOR)
-		_ring(landing + landing_normal * 0.05, landing_normal, 0.09, 0.09, DASH_COLOR) # centre dot
+	if path.landed and (preview_fraction >= 1.0 or count >= points.size()):
+		var landing: Vector3 = path.landing
+		var n: Vector3 = path.normal
+		_ring(landing + n * 0.04, n, LANDING_RADIUS + 0.05, 0.13, DASH_OUTLINE)
+		_ring(landing + n * 0.05, n, LANDING_RADIUS, 0.07, DASH_COLOR)
+		_ring(landing + n * 0.05, n, 0.09, 0.09, DASH_COLOR) # centre dot
 	_preview_mesh.surface_end()
+
+
+## The flight from p at velocity v under constant acceleration a, until it
+## meets the ground, a wall or the lata: {points, landed, landing, normal}.
+func _trace(p: Vector3, v: Vector3, a: Vector3) -> Dictionary:
+	var points: Array[Vector3] = [p]
+	var out := {"points": points, "landed": false, "landing": Vector3.ZERO, "normal": Vector3.UP}
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = [(_player as CollisionObject3D).get_rid()]
+	var t := 0.0
+	while t < preview_max_time:
+		t += preview_step
+		var next := p + v * t + 0.5 * a * t * t
+		var q := PhysicsRayQueryParameters3D.create(points[-1], next)
+		q.exclude = exclude
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			points.append(hit.position)
+			out.landing = hit.position
+			out.normal = hit.normal
+			out.landed = true
+			break
+		points.append(next)
+		if next.y <= 0.0:
+			out.landing = Vector3(next.x, 0.0, next.z)
+			out.landed = true
+			break
+	return out
 
 
 ## One dash: a flat strip from a to b that always faces the camera.

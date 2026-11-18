@@ -1,0 +1,1 @@
+{ "out_dir": "C:/Users/user/Documents/tumbang-henyo/art/source/trailer/intro_clips", "fps": 30.0, "resolution": "1920x1080", "width": 1920.0, "height": 1080.0, "quality": 0.75, "timeout_s": 600.0, "jobs": [{ "name": "speed_1_3" }, { "name": "speed_4_6" }, { "name": "speed_7_9" }, { "name": "speed_10_12" }, { "name": "speed_13_14" }, { "name": "speed_15_15" }] }

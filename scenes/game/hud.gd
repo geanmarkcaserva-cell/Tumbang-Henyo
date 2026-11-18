@@ -67,6 +67,9 @@ var _over_title: Label
 var _fade: ColorRect
 var _fade_tween: Tween
 var _settings_panel: Control
+var _hud_k := 0.0 ## the HUD's current scale (Settings.hud_scale)
+var _collection_panel: Control ## the main menu's Collection card, opened from the pause menu
+var _collection: CollectionPanel
 var _choice_panel: Control
 var _choice_title: Label
 var _choice_body: Label
@@ -105,6 +108,8 @@ var _awra_ready := false
 var _last_awra := 0
 var _last_score := 0
 var _last_caps := 0
+var _caps_tween: Tween
+const CAP_FLY_DELAY := 0.6 ## seconds before the first flying cap reaches the counter
 var _exhausted := false
 var _tutorial_running := false
 var _tip_token := 0
@@ -126,7 +131,6 @@ func _ready() -> void:
 	_build_bullseye()
 	_build_class_board()
 	_build_hints()
-	_build_reticle()
 	_build_coach()
 
 	touch = TouchControls.new()
@@ -147,10 +151,14 @@ func _ready() -> void:
 	_fade.z_index = 40 # over the game and quiz, under pause / game over (50)
 	add_child(_fade)
 	_settings_panel = _build_settings_panel()
+	_collection_panel = _build_collection_panel()
 	_choice_panel = _build_choice_panel()
-	UiFx.shrink(self) # a bit smaller than drawn, each piece toward its own edge
+	# A bit smaller than drawn (Settings > HUD size), each piece toward its own edge.
+	_hud_k = Settings.hud_scale()
+	UiFx.shrink(self, _hud_k)
 
 	Settings.changed.connect(_apply_touch_setting)
+	Settings.changed.connect(_apply_hud_size)
 	_apply_touch_setting()
 	set_context("none")
 
@@ -168,6 +176,18 @@ func set_context(ctx: String) -> void:
 	touch.context = ctx
 	_wind_box.visible = ctx == "throw"
 	_update_hints()
+
+
+## Settings > HUD size changed (even from the pause menu): resize at once.
+func _apply_hud_size() -> void:
+	var k := Settings.hud_scale()
+	if is_equal_approx(k, _hud_k):
+		return
+	_hud_k = k
+	UiFx.shrink(self, k)
+	if coach:
+		coach.set_meta("fx_base", Vector2.ONE * k)
+		coach.scale = Vector2.ONE * k
 
 
 func _apply_touch_setting() -> void:
@@ -284,11 +304,73 @@ func set_score(value: int) -> void:
 
 
 func set_caps(value: int) -> void:
-	_caps_label.text = _thousands(value)
+	if _caps_tween:
+		_caps_tween.kill()
 	if value > _last_caps and _last_caps > 0:
-		UiFx.bounce(_caps_label, 1.2)
-		UiFx.bounce(_caps_icon, 1.3, 0.6)
+		# Earned: the count ticks up as the flying caps (cap_burst) land.
+		_caps_tween = create_tween()
+		_caps_tween.tween_interval(CAP_FLY_DELAY)
+		_caps_tween.tween_method(func(v: float): _caps_label.text = _thousands(int(v)),
+				float(_last_caps), float(value), 0.55)
+		_caps_tween.tween_callback(func():
+			UiFx.bounce(_caps_label, 1.2)
+			UiFx.bounce(_caps_icon, 1.3, 0.6))
+	else:
+		_caps_label.text = _thousands(value)
 	_last_caps = value
+
+
+## Bottlecaps earned: a little burst of caps pops out (from the middle of the
+## screen, or `from`) and they fly one by one into the counter, top right.
+func cap_burst(amount: int, from: Vector2 = Vector2(-1.0, -1.0)) -> void:
+	if amount <= 0 or _caps_icon == null or not _caps_icon.is_visible_in_tree():
+		return
+	var vp := get_viewport().get_visible_rect().size
+	var start := from if from.x >= 0.0 else Vector2(vp.x * 0.5, vp.y * 0.42)
+	var target := _caps_icon.get_global_transform() * (_caps_icon.size * 0.5)
+	var n := clampi(int(amount / 5.0), 3, 10)
+	for i in n:
+		var cap := TextureRect.new()
+		cap.texture = ICON_TANSAN
+		cap.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		cap.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		cap.size = Vector2(58, 58)
+		cap.pivot_offset = cap.size * 0.5
+		cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cap.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(cap)
+		cap.position = start - cap.size * 0.5
+		cap.scale = Vector2.ZERO
+		var spread := start + Vector2.from_angle(randf() * TAU) * randf_range(50.0, 150.0) - cap.size * 0.5
+		var t := cap.create_tween()
+		# Pop out in a little burst, spinning...
+		t.tween_property(cap, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(cap, "position", spread, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(cap, "rotation", randf_range(-3.0, 3.0), 0.3)
+		# ...then one after another into the counter.
+		t.tween_interval(0.06 + i * 0.05)
+		t.tween_property(cap, "position", target - cap.size * 0.5, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		t.parallel().tween_property(cap, "scale", Vector2(0.55, 0.55), 0.42)
+		t.parallel().tween_property(cap, "rotation", 0.0, 0.42)
+		var last := i == n - 1
+		t.tween_callback(func():
+			UiFx.bounce(_caps_icon, 1.25, 0.3)
+			if i % 2 == 0 or last:
+				Sfx.play("coin", -12.0, 1.1 + i * 0.04, 0.03)
+			cap.queue_free())
+	# The "+N" floats up under the counter.
+	var plus := UiKit.title("+%d" % amount, 42, UiKit.ACCENT, 8)
+	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plus.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(plus)
+	plus.position = target + Vector2(-40.0, 40.0)
+	plus.modulate.a = 0.0
+	var pt := plus.create_tween()
+	pt.tween_interval(CAP_FLY_DELAY)
+	pt.tween_property(plus, "modulate:a", 1.0, 0.15)
+	pt.parallel().tween_property(plus, "position:y", plus.position.y - 30.0, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	pt.tween_property(plus, "modulate:a", 0.0, 0.35)
+	pt.tween_callback(plus.queue_free)
 
 
 func show_status(text: String) -> void:
@@ -581,8 +663,9 @@ func update_wind(wind: Vector3, view_basis: Basis) -> void:
 
 
 func show_pause(on: bool) -> void:
-	var was := _pause_panel.visible or _settings_panel.visible
+	var was := _pause_panel.visible or _settings_panel.visible or _collection_panel.visible
 	_settings_panel.visible = false
+	_collection_panel.visible = false
 	_pause_skip.visible = _tutorial_running
 	_pause_panel.visible = on
 	if on and not was:
@@ -595,7 +678,7 @@ func show_game_over(score: int, rounds: int, caps_earned: int, rank: int, best: 
 	var lines := [
 		"Score:  %s" % _thousands(score),
 		"Rounds cleared:  %d" % rounds,
-		"Caps earned:  %d" % caps_earned,
+		("Caps earned:  %d" % caps_earned) if caps_earned >= 0 else "Caps:  none in custom quizzes (practice)",
 	]
 	if rank == 1:
 		lines.append("NEW BEST!")
@@ -985,16 +1068,6 @@ func _build_hints() -> void:
 	add_child(_hints)
 
 
-func _build_reticle() -> void:
-	var r := Reticle.new()
-	r.set_anchors_preset(Control.PRESET_CENTER)
-	r.offset_left = -22
-	r.offset_right = 22
-	r.offset_top = -22
-	r.offset_bottom = 22
-	_throw_ui.add_child(r)
-
-
 func _build_coach() -> void:
 	var holder := Control.new()
 	holder.name = "CoachLayer"
@@ -1008,9 +1081,9 @@ func _build_coach() -> void:
 	coach.position = Vector2(28, 300) # under the stats and the clock, clear of the aim
 	# Sized by hand (it moves between the side and the centre): fixed top-left pivot.
 	coach.set_meta("fx_skip", true)
-	coach.set_meta("fx_base", Vector2.ONE * UiFx.UI_SCALE)
+	coach.set_meta("fx_base", Vector2.ONE * Settings.hud_scale())
 	coach.set_meta("fx_pivot_locked", true)
-	coach.scale = Vector2.ONE * UiFx.UI_SCALE
+	coach.scale = Vector2.ONE * Settings.hud_scale()
 	coach.pivot_offset = Vector2.ZERO
 	holder.add_child(coach)
 
@@ -1085,6 +1158,9 @@ func _build_pause_panel() -> Control:
 	var settings := UiKit.button("Settings", UiKit.BLUE, 52, Vector2(460, 120))
 	settings.pressed.connect(_open_settings)
 	v.add_child(settings)
+	var collection := UiKit.button("Collection", UiKit.BLUE, 52, Vector2(460, 120))
+	collection.pressed.connect(_open_collection)
+	v.add_child(collection)
 	_pause_skip = UiKit.button("Skip tutorial", UiKit.BLUE, 52, Vector2(460, 120))
 	_pause_skip.pressed.connect(func(): skip_tutorial_pressed.emit())
 	_pause_skip.visible = false
@@ -1115,6 +1191,30 @@ func _open_settings() -> void:
 
 func _close_settings() -> void:
 	_settings_panel.visible = false
+	_pause_panel.visible = true
+	UiFx.pop_in(_pause_panel)
+
+
+## Collection from the pause menu: the same card as the main menu's
+## (hidden items, characters, slippers); Back returns to the pause menu.
+func _build_collection_panel() -> Control:
+	var root := _dim_backdrop()
+	(root as ColorRect).color = Color(0, 0, 0, 0.85) # darker: the quiz card can sit right behind it
+	_collection = CollectionPanel.new()
+	_collection.back_pressed.connect(_close_collection)
+	root.add_child(_collection)
+	return root
+
+
+func _open_collection() -> void:
+	_pause_panel.visible = false
+	_collection.refresh() # anything found or bought this run shows up
+	_collection_panel.visible = true
+	UiFx.pop_in(_collection_panel)
+
+
+func _close_collection() -> void:
+	_collection_panel.visible = false
 	_pause_panel.visible = true
 	UiFx.pop_in(_pause_panel)
 
@@ -1332,18 +1432,6 @@ class Chevron extends Control:
 		var w := size.x
 		var h := size.y
 		draw_polyline(PackedVector2Array([Vector2(w * 0.15, h * 0.35), Vector2(w * 0.5, h * 0.7), Vector2(w * 0.85, h * 0.35)]), UiKit.ACCENT, 4.0, true)
-
-
-## Aim reticle: a thin ring with a dot.
-class Reticle extends Control:
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _draw() -> void:
-		var c := size * 0.5
-		draw_arc(c, 15.0, 0, TAU, 40, Color(0, 0, 0, 0.45), 6.0, true)
-		draw_arc(c, 15.0, 0, TAU, 40, Color(1, 1, 1, 0.9), 2.5, true)
-		draw_circle(c, 3.5, Color(1, 1, 1, 0.95))
 
 
 ## Pulsing ring around whatever the tutorial is talking about.

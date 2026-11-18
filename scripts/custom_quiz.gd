@@ -2,15 +2,19 @@ class_name CustomQuiz
 extends RefCounted
 ## Custom mode: players bring their own questions and answer keys.
 ## Works fully offline, on PC and Android. Sets are saved in user://custom_sets/.
+## Beta: the custom screen takes questions by copy and paste only for now
+## (read_file() below is kept for when file upload comes back).
 ##
 ## Accepted input (typed, pasted, or opened from a .txt / .csv / .docx file):
 ##
+##   Easy
 ##   1. Sino ang pambansang bayani ng Pilipinas?
 ##   a) Jose Rizal *
 ##   b) Andres Bonifacio
 ##   c) Apolinario Mabini
 ##   Why: Optional explanation shown after answering.
 ##
+##   Hard
 ##   2. Ano ang kabisera ng Pilipinas?
 ##   Answer: Maynila
 ##
@@ -20,8 +24,13 @@ extends RefCounted
 ## - No choices, just "Answer: <text>"? The game makes the two wrong
 ##   choices from the other questions' answers (identification style).
 ## - More than 3 choices: the right one plus 2 random wrong ones are used.
+## - Difficulty: a heading line "Easy" / "Medium" / "Hard" covers the questions
+##   under it, or a "Level: hard" line sets one question. Untagged questions are
+##   split by position: the first third easy, the middle medium, the rest hard,
+##   so a set written from easy to hard plays that way (like the built-in
+##   themes: rounds 1-5 easy, 6-10 medium, then hard).
 ## - CSV with the game's own columns (question, choice_a, choice_b, choice_c,
-##   answer, explanation) also works, e.g. exported from Google Sheets.
+##   answer, explanation, and optionally tier) also works, e.g. from Google Sheets.
 
 const DIR := "user://custom_sets/"
 const THEME_PREFIX := "custom:"
@@ -29,6 +38,7 @@ const CHOICES := 3
 
 const HELP := """Paste or type your questions. Example:
 
+Easy
 1. Sino ang pambansang bayani ng Pilipinas?
 a) Jose Rizal *
 b) Andres Bonifacio
@@ -38,13 +48,18 @@ Why: (optional) explanation after answering
 2. Ano ang kabisera ng Pilipinas?
 Answer: Maynila
 
+Hard
 3. Saang probinsya ang Bulkang Mayon?
 Answer: Albay
 
 - Put * after the right choice, or write  Answer: b
 - Only an answer, no choices? The game makes the wrong
   choices from your other answers.
-- You can also open a .txt, .csv or Word (.docx) file."""
+- Difficulty: write Easy, Medium or Hard on its own line
+  above a group of questions, or add  Level: hard  to one.
+  No levels? The first third plays as easy, the middle as
+  medium and the rest as hard.
+- Beta: copy and paste for now. File upload is coming soon."""
 
 ## For the AI PROMPT button: the player pastes this into ChatGPT, Claude,
 ## Gemini etc. together with their notes, then pastes the answer back here.
@@ -53,19 +68,20 @@ const AI_PROMPT := """Make a quiz for a school game from my notes below.
 Rules:
 - Write 15 multiple-choice questions. Use only facts from my notes.
 - Use the same language as my notes (Filipino, English or Taglish).
+- Make 5 easy, then 5 medium, then 5 hard questions, in that order.
 - Each question has exactly 3 choices: a), b) and c). Exactly one is correct.
 - Put an asterisk * right after the correct choice.
 - Add a line starting with "Why:" that explains the answer in one short sentence.
+- Add a line "Level: easy", "Level: medium" or "Level: hard" to every question.
 - Keep each question under 25 words and each choice under 8 words.
 - Wrong choices must be believable. No "all of the above" or "none of the above".
 - Mix which letter is correct.
 - Number the questions and leave one blank line between them.
-- Put each question, each choice and the Why line on its OWN line.
+- Put each question, each choice, the Why line and the Level line on its OWN line.
 - Plain text only: no title, no intro, no bold, no backslashes.
 
 How to give it to me:
-- If you can create files, give me a downloadable file named quiz.txt.
-- Otherwise put the whole quiz inside ONE code block (```), so I can copy it exactly with the copy button.
+- Put the whole quiz inside ONE code block (```), so I can copy it exactly with the copy button. Don't make a file.
 
 Format example:
 1. Sino ang pambansang bayani ng Pilipinas?
@@ -73,19 +89,23 @@ a) Jose Rizal *
 b) Andres Bonifacio
 c) Apolinario Mabini
 Why: Si Rizal ang itinanghal na pambansang bayani dahil sa kanyang mga akda.
+Level: easy
 
 My notes:
 [paste your notes or lesson here, or attach the file]"""
 
 static var _choice_re := RegEx.create_from_string("^\\(?([a-dA-D])[\\).:]\\s*(.+)$")
 static var _number_re := RegEx.create_from_string("^(?:[Qq](?:uestion)?\\s*\\d*\\s*[:.)]|\\d+\\s*[.)])\\s*(.*)$")
-static var _key_re := RegEx.create_from_string("^(?i)(correct answer|correct|answer key|answer|ans|sagot|tamang sagot|key|why|explanation|paliwanag|reason|rationale)\\s*[:\\-]\\s*(.*)$")
+static var _key_re := RegEx.create_from_string("^(?i)(correct answer|correct|answer key|answer|ans|sagot|tamang sagot|key|why|explanation|paliwanag|reason|rationale|level|difficulty|tier|antas)\\s*[:\\-]\\s*(.*)$")
 ## Markdown escapes from chat "copy" buttons: 1\\.  \\*  a\\)  ->  1.  *  a)
 static var _escape_re := RegEx.create_from_string("\\\\([\\\\`*_{}\\[\\]()#+\\-.!|>~])")
 ## Choices squashed onto the question's line: "...? a) X b) Y * c) Z Why: ..."
 static var _inline_paren_re := RegEx.create_from_string("\\s+(?=\\(?[a-dA-D]\\)\\s)")
 static var _inline_dot_re := RegEx.create_from_string("\\s+(?=[a-dA-D]\\.\\s)")
-static var _inline_key_re := RegEx.create_from_string("(?i)\\s+(?=(?:why|answer|correct answer|sagot|explanation|paliwanag)\\s*:)")
+static var _inline_key_re := RegEx.create_from_string("(?i)\\s+(?=(?:why|answer|correct answer|sagot|explanation|paliwanag|level|difficulty)\\s*:)")
+## A heading line that sets the difficulty of the questions under it:
+## "Easy", "Medium questions:", "Part 3: Hard", "## Mahirap" ...
+static var _tier_heading_re := RegEx.create_from_string("^(?i)(?:(?:part|section|round|set|bahagi)\\s*\\d*\\s*[:.\\-]?\\s*)?([a-z]+)(?:\\s+(?:questions?|items?|round|level|part|tanong))?\\s*[:.]?$")
 
 
 # --- Parsing ------------------------------------------------------------------
@@ -109,7 +129,12 @@ static func parse(text: String, theme: String = "custom:preview") -> Dictionary:
 		if q.answer_text != "" and not answer_pool.has(q.answer_text):
 			answer_pool.append(q.answer_text)
 	var questions: Array = []
+	var section_tier := "" # set by an "Easy" / "Medium" / "Hard" heading line
 	for q in raw:
+		var heading := _heading_tier(q)
+		if heading != "":
+			section_tier = heading
+			continue
 		if _is_chatter(q):
 			continue # "Here is your quiz!" and similar lines from AI chats
 		var built := _finish(q, answer_pool)
@@ -118,8 +143,13 @@ static func parse(text: String, theme: String = "custom:preview") -> Dictionary:
 			continue
 		built.id = "%s#%d" % [theme, questions.size() + 1]
 		built.theme = theme
-		built.tier = "easy"
+		built.tier = q.tier if q.tier != "" else section_tier
 		questions.append(built)
+	# Untagged questions: by position, first third easy, middle medium, rest hard.
+	var n := questions.size()
+	for i in n:
+		if questions[i].tier == "":
+			questions[i].tier = "easy" if i * 3 < n else ("medium" if i * 3 < n * 2 else "hard")
 	if questions.is_empty() and errors.is_empty():
 		errors.append("No questions found yet. Tap FORMAT HELP for an example.")
 	return {"questions": questions, "errors": errors}
@@ -166,6 +196,13 @@ static func _split_blocks(text: String) -> Array:
 	var lines := text.split("\n")
 	for i in lines.size():
 		var line := lines[i].strip_edges()
+		if is_tier_heading(line):
+			if not current.is_empty():
+				blocks.append({"lines": current, "line": start_line})
+				current = []
+			var heading: Array[String] = [line]
+			blocks.append({"lines": heading, "line": i + 1})
+			continue
 		var starts_new := line == "" or (_number_re.search(line) != null and not current.is_empty() \
 				and _choice_re.search(line) == null)
 		if starts_new and not current.is_empty():
@@ -182,14 +219,16 @@ static func _split_blocks(text: String) -> Array:
 
 static func _parse_block(lines: Array[String]) -> Dictionary:
 	var q := {"question": "", "choices": [], "correct": -1, "answer_key": "", "answer_text": "",
-			"explanation": "", "numbered": _number_re.search(lines[0]) != null}
+			"explanation": "", "tier": "", "numbered": _number_re.search(lines[0]) != null}
 	for line in lines:
 		var key := _key_re.search(line)
 		if key:
 			var k := key.get_string(1).to_lower()
 			var value := key.get_string(2).strip_edges()
-			if k in ["why", "explanation", "paliwanag", "reason"]:
+			if k in ["why", "explanation", "paliwanag", "reason", "rationale"]:
 				q.explanation = value
+			elif k in ["level", "difficulty", "tier", "antas"]:
+				q.tier = tier_word(value)
 			else:
 				q.answer_key = value
 			continue
@@ -220,6 +259,37 @@ static func _parse_block(lines: Array[String]) -> Dictionary:
 	if q.correct >= 0 and q.answer_text == "":
 		q.answer_text = q.choices[q.correct]
 	return q
+
+
+## "Hard", "advanced", "mahirap"... -> "hard" (or "" when it isn't a level).
+static func tier_word(word: String) -> String:
+	var w := word.strip_edges().to_lower().trim_suffix(".").trim_suffix(":")
+	if w in ["easy", "basic", "simple", "beginner", "madali"]:
+		return "easy"
+	if w in ["medium", "average", "moderate", "normal", "intermediate", "katamtaman"]:
+		return "medium"
+	if w in ["hard", "difficult", "advanced", "challenging", "expert", "mahirap"]:
+		return "hard"
+	return ""
+
+
+## A line that is only a level heading ("Easy", "Part 2: Medium questions").
+static func is_tier_heading(line: String) -> bool:
+	if _key_re.search(line):
+		return false # "Level: hard" inside a question tags just that question
+	var m := _tier_heading_re.search(line)
+	return m != null and tier_word(m.get_string(1)) != ""
+
+
+## The level a heading block sets ("" when the block is a question).
+## A "Level: hard" line on its own (blank lines around it) also counts.
+static func _heading_tier(q: Dictionary) -> String:
+	if not q.choices.is_empty() or q.answer_key != "" or q.numbered:
+		return ""
+	if q.question == "":
+		return q.tier
+	var m := _tier_heading_re.search(String(q.question))
+	return tier_word(m.get_string(1)) if m else ""
 
 
 static func _strip_mark(s: String) -> Dictionary:
@@ -308,6 +378,9 @@ static func _parse_csv(text: String, theme: String) -> Dictionary:
 				rec.get("choice_a", ""), rec.get("choice_b", ""), rec.get("choice_c", ""), rec.get("answer", "")]
 		if rec.get("explanation", "") != "":
 			out += "Why: %s\n" % rec.explanation
+		var level: String = rec.get("tier", rec.get("difficulty", rec.get("level", "")))
+		if tier_word(level) != "":
+			out += "Level: %s\n" % level
 		out += "\n"
 	f.close()
 	DirAccess.remove_absolute(path)
@@ -358,19 +431,21 @@ static func list_sets() -> Array:
 		if file_name.ends_with(".json"):
 			var data := _load(file_name.get_basename())
 			if not data.is_empty():
-				sets.append({"id": file_name.get_basename(), "title": data.title, "count": data.count})
+				sets.append({"id": file_name.get_basename(), "title": data.title, "count": data.count,
+						"desc": String(data.get("desc", ""))})
 	sets.sort_custom(func(a, b): return a.title.naturalnocasecmp_to(b.title) < 0)
 	return sets
 
 
-## Save (create or overwrite). Returns the set id.
-static func save_set(title: String, text: String, set_id: String = "") -> String:
+## Save (create or overwrite). Returns the set id. desc: an optional line
+## about the set (e.g. "Quarter 2 long test, section A"), shown in Records.
+static func save_set(title: String, text: String, set_id: String = "", desc: String = "") -> String:
 	DirAccess.make_dir_recursive_absolute(DIR)
 	if set_id == "":
 		set_id = "set_%d" % Time.get_unix_time_from_system()
 	var count: int = parse(text).questions.size()
 	var f := FileAccess.open(DIR + set_id + ".json", FileAccess.WRITE)
-	f.store_string(JSON.stringify({"title": title.strip_edges(), "text": text, "count": count}))
+	f.store_string(JSON.stringify({"title": title.strip_edges(), "desc": desc.strip_edges(), "text": text, "count": count}))
 	f.close()
 	return set_id
 
@@ -394,6 +469,12 @@ static func is_custom(theme: String) -> bool:
 static func title_of(theme: String) -> String:
 	var data := _load(theme.trim_prefix(THEME_PREFIX))
 	return data.get("title", "Custom")
+
+
+## The set's description line ("" if none, or not on this device).
+static func desc_of(theme: String) -> String:
+	var data := _load(theme.trim_prefix(THEME_PREFIX))
+	return String(data.get("desc", ""))
 
 
 ## Parse a saved set and hand its questions to QuizDatabase. Returns the count.

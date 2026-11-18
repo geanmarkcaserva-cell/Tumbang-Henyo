@@ -49,6 +49,7 @@ const BACK_OF := {
 const CHARACTER_PIXEL := 0.08 ## metres per pixel: 22 px tall -> 1.76 m
 ## Lens for shots that don't set their own "fov".
 const DEFAULT_FOV := 70.0
+const CAP_ICON := preload("res://art/ui/hud/icon_tansan.webp")
 
 var cam_pos := Vector3.ZERO
 var cam_look := Vector3.ZERO
@@ -62,7 +63,10 @@ var _current := ""
 var _selected_theme := ""
 var _theme_buttons := {}
 var _board_title: Label
-var _board_rows: Array[Label] = []
+var _board_rows: Array[Label] = [] ## leaderboard cells, 4 per rank
+## Leaderboard on the game mode screen (design size): from beside the theme
+## list to the right edge.
+const BOARD_RECT := Rect2(550, 110, 1320, 790)
 var _continue_btn: Button
 var _pickers := {} ## "character" / "weapon" -> picker state
 var _lobby := {} ## character id -> {root, sprite, look, state, since, happy}
@@ -70,6 +74,8 @@ var _focus_id := "" ## the lobby character the camera is on
 var _custom_id := "" ## custom set open in the editor ("" = new, unsaved)
 var _custom_list: VBoxContainer
 var _custom_title: LineEdit
+var _custom_desc: LineEdit ## optional line about the set, kept with its Records
+var _records: RecordsPanel
 var _custom_text: TextEdit
 var _custom_status: Label
 var _custom_delete: Button
@@ -90,10 +96,13 @@ const TEAM_CAM := Vector3(0.3, 1.15, 2.8)
 const TEAM_LOOK := Vector3(-0.7, 0.95, 0.0)
 var _ach_back := "main" ## achievements opened from the main menu or from an account card
 var _account_chip: Button
+var _chip_letter: Label ## the first letter on a plain colour badge
 var _delete_armed := false
-var _file_dialog: FileDialog
-var _help_dialog: AcceptDialog
-var _ai_dialog: AcceptDialog
+var _custom_panel: PanelContainer
+var _custom_tour: CustomTutorial
+var _tour_actor: SpriteActor
+## The custom editor's place on screen (final size: it isn't shrunk with the rest).
+const CUSTOM_PANEL := Rect2(620, 118, 1180, 790)
 ## The slipper in weapon select is drawn in 2D (over the court) so its
 ## pixel art keeps its exact colours; the 3D view's tone mapping would
 ## darken and wash it out.
@@ -112,6 +121,13 @@ func _ready() -> void:
 	var taya := get_node_or_null("Arena/Taya")
 	if taya:
 		taya.queue_free()
+	# The sun in the sky (and, in High quality, its light rays), like in the game.
+	var sun := get_node_or_null("Arena/Sun") as DirectionalLight3D
+	if sun:
+		var bodies := SkyBodies.new()
+		bodies.name = "SkyBodies"
+		bodies.light = sun
+		add_child(bodies)
 	_build_lobby()
 	_build_team()
 	var ui := CanvasLayer.new()
@@ -133,6 +149,21 @@ func _ready() -> void:
 	# A bit smaller than the layouts were drawn, each piece toward its own edge.
 	for key in _panels:
 		UiFx.shrink(_panels[key])
+	# The custom editor is laid out at its final size, beside the set list.
+	_custom_panel.set_meta("fx_base", Vector2.ONE)
+	_custom_panel.scale = Vector2.ONE
+	# The custom quiz tour sits above every menu.
+	var tour_layer := CanvasLayer.new()
+	tour_layer.layer = 5
+	add_child(tour_layer)
+	_custom_tour = CustomTutorial.new()
+	tour_layer.add_child(_custom_tour)
+	# Custom quiz -> Records, over the custom screen (under the tour).
+	var records_layer := CanvasLayer.new()
+	records_layer.layer = 4
+	add_child(records_layer)
+	_records = RecordsPanel.new()
+	records_layer.add_child(_records)
 	_select_theme(GameManager.selected_theme)
 	# Back from a class game: straight to the lobby screen.
 	if Lobby.is_host():
@@ -177,6 +208,9 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
+		if _records and _records.visible:
+			_records.hide_panel()
+			return
 		if _current == "account" and (_account_panel.cancel() or not Accounts.has_any()):
 			return # closed the name box, or there's no account to go back with yet
 		if BACK_OF.has(_current) and not (_current == "custom" and _custom_text.has_focus()):
@@ -217,6 +251,7 @@ func _back_of(panel_id: String) -> String:
 func _show(panel_id: String, instant: bool = false) -> void:
 	var changed := panel_id != _current
 	_current = panel_id
+	_build_lazy(panel_id)
 	if panel_id == "custom":
 		_enter_custom()
 	elif panel_id == "join":
@@ -464,6 +499,16 @@ func _build_main(ui: CanvasLayer) -> Control:
 	_account_chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_account_chip.pressed.connect(func(): _show("account"))
 	root.add_child(_account_chip)
+	# A plain colour badge gets the name's first letter on it.
+	_chip_letter = UiKit.title("", 34, Color.WHITE, 6)
+	_chip_letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_chip_letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_chip_letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_chip_letter.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	var pad := _account_chip.get_theme_stylebox("normal").content_margin_left
+	_chip_letter.offset_left = pad
+	_chip_letter.offset_right = pad + 60.0
+	_account_chip.add_child(_chip_letter)
 	Accounts.changed.connect(_update_account_chip)
 	_update_account_chip()
 	return root
@@ -476,6 +521,8 @@ func _update_account_chip() -> void:
 		return
 	_account_chip.text = a.name
 	_account_chip.icon = AccountPanel.avatar_texture(a, 60)
+	_chip_letter.text = String(a.name).left(1).to_upper()
+	_chip_letter.visible = String(a.get("avatar", {}).get("kind", "letter")) == "letter"
 
 
 # --- Choose game mode -----------------------------------------------------------
@@ -509,10 +556,10 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	custom.pressed.connect(func(): _show("custom"))
 	list.add_child(custom)
 
-	# Leaderboard panel.
+	# Leaderboard panel: wide, from beside the theme list to the right edge.
 	var board := PanelContainer.new()
-	board.position = Vector2(940, 110)
-	board.custom_minimum_size = Vector2(930, 790)
+	board.position = Vector2(BOARD_RECT.position.x, 110)
+	board.custom_minimum_size = Vector2(BOARD_RECT.size.x, 790)
 	board.add_theme_stylebox_override("panel", UiKit.box(UiKit.PANEL_DARK, Color(0.3, 0.3, 0.32), 10, 4))
 	root.add_child(board)
 	var v := VBoxContainer.new()
@@ -523,21 +570,46 @@ func _build_mode(ui: CanvasLayer) -> Control:
 	_board_title = UiKit.title("", 46, UiKit.ACCENT, 6)
 	_board_title.clip_text = true
 	_board_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_board_title.custom_minimum_size = Vector2(860, 0)
+	_board_title.custom_minimum_size = Vector2(BOARD_RECT.size.x - 80, 0)
 	v.add_child(_board_title)
 	v.add_child(HSeparator.new())
+	# Rank | name | score | round, in tidy columns with smaller text.
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 40)
+	grid.add_theme_constant_override("v_separation", 10)
+	v.add_child(grid)
+	for head in ["#", "Player", "Score", "Round"]:
+		var h := UiKit.label(head, 26, Color(1, 1, 1, 0.5), 0)
+		if head == "Player":
+			h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(h)
 	var rank_colors := [Color(1.0, 0.85, 0.35), Color(0.85, 0.85, 0.9), Color(0.85, 0.7, 0.75)]
 	_board_rows.clear()
 	for i in 7:
-		var row := UiKit.label("%d    ---" % (i + 1), 44, rank_colors[i] if i < 3 else Color.WHITE, 0)
-		v.add_child(row)
-		_board_rows.append(row)
+		var col: Color = rank_colors[i] if i < 3 else Color.WHITE
+		for c in 4:
+			var cell := UiKit.label("", 34, col, 0)
+			if c == 1:
+				cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				cell.clip_text = true
+				cell.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			if c >= 2:
+				cell.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			grid.add_child(cell)
+			_board_rows.append(cell)
+	var bfill := Control.new()
+	bfill.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(bfill)
 	v.add_child(UiKit.label("Your best runs on this device. Online boards come later.", 24, Color(1, 1, 1, 0.65)))
 
-	# Bottom buttons: back, continue (only with a saved run), next.
+	# Bottom buttons, lined up with the board's right edge: back, continue
+	# (only with a saved run), next.
 	var row_btns := HBoxContainer.new()
 	row_btns.add_theme_constant_override("separation", 24)
-	row_btns.position = Vector2(940, 935)
+	row_btns.alignment = BoxContainer.ALIGNMENT_END
+	row_btns.position = Vector2(BOARD_RECT.position.x, 935)
+	row_btns.custom_minimum_size = Vector2(BOARD_RECT.size.x, 0)
 	root.add_child(row_btns)
 	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.pressed.connect(func(): _show("main"))
@@ -563,12 +635,19 @@ func _select_theme(theme_id: String) -> void:
 
 func _fill_board(theme_id: String) -> void:
 	var entries := GameManager.local_board(theme_id)
-	for i in _board_rows.size():
+	# _board_rows holds 4 cells per rank: #, name, score, round.
+	for i in int(_board_rows.size() / 4.0):
+		var cells := _board_rows.slice(i * 4, i * 4 + 4)
+		cells[0].text = str(i + 1)
 		if i < entries.size():
 			var e: Dictionary = entries[i]
-			_board_rows[i].text = "%d    %s    %d  (R%d)" % [i + 1, e.name, e.score, e.rounds]
+			cells[1].text = String(e.name)
+			cells[2].text = str(e.score)
+			cells[3].text = "R%d" % e.rounds
 		else:
-			_board_rows[i].text = "%d    ---" % (i + 1)
+			cells[1].text = "---"
+			cells[2].text = ""
+			cells[3].text = ""
 
 
 # --- Custom quiz (player-made question sets) -----------------------------------
@@ -576,9 +655,16 @@ func _fill_board(theme_id: String) -> void:
 func _build_custom(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
-	var title := UiKit.title("Custom quiz", 76, Color.WHITE, 16)
-	title.position = Vector2(30, 10)
-	root.add_child(title)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 22)
+	head.position = Vector2(30, 10)
+	root.add_child(head)
+	head.add_child(UiKit.title("Custom quiz", 76, Color.WHITE, 16))
+	head.add_child(CustomTutorial.beta_chip(34))
+	# Practice mode: made-up questions could farm caps, so these give none.
+	var no_caps := UiKit.label("For practice: custom quizzes don't give bottlecaps", 26, UiKit.ACCENT)
+	no_caps.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(no_caps)
 
 	# Left: saved sets.
 	var left := VBoxContainer.new()
@@ -595,55 +681,77 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	_custom_list = VBoxContainer.new()
 	_custom_list.add_theme_constant_override("separation", 14)
 	scroll.add_child(_custom_list)
+	# Past games of the sets: scores with each set's name and description.
+	var records := UiKit.button("Records", UiKit.BLUE, 36, Vector2(540, 90))
+	records.pressed.connect(func(): _records.open(_custom_id, _custom_title.text.strip_edges()))
+	left.add_child(records)
 
-	# Right: editor.
+	# Middle: the editor. Laid out at its final on-screen size (it isn't
+	# shrunk with the rest, see _ready), between the list and the right edge.
 	var panel := PanelContainer.new()
-	panel.position = Vector2(640, 110)
-	panel.custom_minimum_size = Vector2(1240, 800)
-	panel.add_theme_stylebox_override("panel", UiKit.box(UiKit.PANEL_DARK, Color(0.3, 0.3, 0.32), 10, 4))
+	panel.position = CUSTOM_PANEL.position
+	panel.custom_minimum_size = CUSTOM_PANEL.size
+	var pbox := UiKit.box(UiKit.PANEL_DARK, Color(0.3, 0.3, 0.32), 10, 4)
+	pbox.content_margin_left = 24
+	pbox.content_margin_right = 24
+	pbox.content_margin_top = 20
+	pbox.content_margin_bottom = 20
+	panel.add_theme_stylebox_override("panel", pbox)
 	root.add_child(panel)
+	_custom_panel = panel
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	panel.add_child(v)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 18)
+	v.add_child(top)
 	_custom_title = LineEdit.new()
 	_custom_title.placeholder_text = "Set name, e.g. Grade 6 Science - Quarter 2"
-	_custom_title.custom_minimum_size = Vector2(0, 72)
-	_custom_title.add_theme_font_size_override("font_size", 34)
-	v.add_child(_custom_title)
+	_custom_title.custom_minimum_size = Vector2(0, 64)
+	_custom_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_custom_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_custom_title.add_theme_font_size_override("font_size", 30)
+	top.add_child(_custom_title)
+	# The player's character in a bubble: tap for the how-it-works tour.
+	top.add_child(_tour_buddy())
+	_custom_desc = LineEdit.new()
+	_custom_desc.placeholder_text = "Test description (optional), e.g. Long test, Section A - shows in Records"
+	_custom_desc.custom_minimum_size = Vector2(0, 54)
+	_custom_desc.add_theme_font_size_override("font_size", 24)
+	v.add_child(_custom_desc)
 	_custom_text = TextEdit.new()
 	_custom_text.placeholder_text = CustomQuiz.HELP
-	_custom_text.custom_minimum_size = Vector2(0, 500)
+	_custom_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_custom_text.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-	_custom_text.add_theme_font_size_override("font_size", 26)
+	_custom_text.add_theme_font_size_override("font_size", 24)
 	_custom_text.text_changed.connect(_validate_custom)
 	v.add_child(_custom_text)
-	_custom_status = UiKit.label("", 26, Color.WHITE, 0)
+	_custom_status = UiKit.label("", 24, Color.WHITE, 0)
 	_custom_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_custom_status.custom_minimum_size = Vector2(1200, 110)
+	_custom_status.custom_minimum_size = Vector2(CUSTOM_PANEL.size.x - 60, 64)
 	v.add_child(_custom_status)
+	# Beta: copy and paste is the one way in, so it's two numbered steps.
 	var tools := HBoxContainer.new()
-	tools.add_theme_constant_override("separation", 20)
+	tools.add_theme_constant_override("separation", 18)
 	v.add_child(tools)
-	var help := UiKit.button("Format help", UiKit.BLUE, 26, Vector2(232, 70))
-	help.pressed.connect(_show_custom_help)
-	tools.add_child(help)
-	var ai := UiKit.button("AI prompt", UiKit.BLUE, 26, Vector2(232, 70))
-	ai.pressed.connect(_show_ai_prompt)
-	tools.add_child(ai)
-	var open := UiKit.button("Open file", UiKit.BLUE, 26, Vector2(232, 70))
-	open.pressed.connect(_open_custom_file)
-	tools.add_child(open)
-	var paste := UiKit.button("Paste", UiKit.BLUE, 26, Vector2(232, 70))
+	var copy := UiKit.button("1  Copy AI prompt", UiKit.BLUE, 30, Vector2(340, 84))
+	copy.pressed.connect(_copy_ai_prompt)
+	tools.add_child(copy)
+	var paste := UiKit.button("2  Paste questions", UiKit.BLUE, 30, Vector2(360, 84))
 	paste.pressed.connect(_paste_custom)
 	tools.add_child(paste)
-	_custom_delete = UiKit.button("Delete", UiKit.BLUE, 26, Vector2(200, 70))
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tools.add_child(gap)
+	_custom_delete = UiKit.button("Delete set", UiKit.BLUE, 26, Vector2(220, 84))
+	_custom_delete.add_theme_color_override("font_color", Color(1.0, 0.62, 0.58))
 	_custom_delete.pressed.connect(_delete_custom)
 	tools.add_child(_custom_delete)
 
-	# Bottom: back, save, play.
+	# Bottom: back, save, host, play (right edge lines up with the editor).
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
-	row.position = Vector2(640, 935)
+	row.position = Vector2(608, 935)
 	root.add_child(row)
 	var back := UiKit.button("Back", UiKit.BLUE, 44, Vector2(250, 110))
 	back.pressed.connect(func(): _show("mode"))
@@ -658,57 +766,55 @@ func _build_custom(ui: CanvasLayer) -> Control:
 	var play := UiKit.button("Play", UiKit.GOLD, 48, Vector2(320, 110))
 	play.pressed.connect(_play_custom)
 	row.add_child(play)
-
-	# File picker: the phone's/PC's own dialog where available.
-	_file_dialog = FileDialog.new()
-	_file_dialog.use_native_dialog = true
-	_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	_file_dialog.filters = PackedStringArray(["*.txt, *.csv, *.docx ; Question files"])
-	_file_dialog.file_selected.connect(_on_custom_file)
-	root.add_child(_file_dialog)
-	_help_dialog = AcceptDialog.new()
-	_help_dialog.title = "Question format"
-	_help_dialog.dialog_text = CustomQuiz.HELP
-	root.add_child(_help_dialog)
-
-	# AI PROMPT: a ready prompt for ChatGPT / Claude / Gemini that makes the AI
-	# answer in this exact format. Selectable, and COPY puts it on the clipboard.
-	_ai_dialog = AcceptDialog.new()
-	_ai_dialog.title = "Make questions with an AI"
-	_ai_dialog.ok_button_text = "COPY PROMPT"
-	var ai_box := VBoxContainer.new()
-	ai_box.add_theme_constant_override("separation", 10)
-	_ai_dialog.add_child(ai_box)
-	var steps := Label.new()
-	steps.text = "1. Tap COPY PROMPT.\n2. Open ChatGPT, Claude or Gemini, paste the prompt and add your notes (or attach the file).\n3. Got a quiz.txt file? Download it and tap OPEN FILE.  Got a code block? Tap its Copy button, then PASTE here.\nCheck the questions before you play!"
-	steps.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	steps.custom_minimum_size = Vector2(1040, 0) # wrapping labels need a width or they grow tall
-	steps.add_theme_font_size_override("font_size", 22)
-	ai_box.add_child(steps)
-	var prompt_view := TextEdit.new()
-	prompt_view.text = CustomQuiz.AI_PROMPT
-	prompt_view.editable = false
-	prompt_view.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-	prompt_view.custom_minimum_size = Vector2(1040, 480)
-	prompt_view.add_theme_font_size_override("font_size", 20)
-	ai_box.add_child(prompt_view)
-	var copy_btn := _ai_dialog.get_ok_button()
-	copy_btn.custom_minimum_size = Vector2(360, 72)
-	copy_btn.add_theme_font_size_override("font_size", 30)
-	_ai_dialog.confirmed.connect(_copy_ai_prompt)
-	root.add_child(_ai_dialog)
 	return root
 
 
-func _show_ai_prompt() -> void:
-	_ai_dialog.popup_centered(Vector2i(1100, 820))
+## Round button with the player's character standing in it (and a "?").
+func _tour_buddy() -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(96, 96)
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = "How it works"
+	var ring := StyleBoxFlat.new()
+	ring.bg_color = Color(1, 1, 1, 0.08)
+	ring.border_color = UiKit.ACCENT
+	ring.set_border_width_all(4)
+	ring.set_corner_radius_all(48)
+	var ring_hover := ring.duplicate() as StyleBoxFlat
+	ring_hover.bg_color = Color(1.0, 0.8, 0.34, 0.25)
+	b.add_theme_stylebox_override("normal", ring)
+	b.add_theme_stylebox_override("hover", ring_hover)
+	b.add_theme_stylebox_override("pressed", ring_hover)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	_tour_actor = SpriteActor.of(Economy.equipped_character, 92.0)
+	_tour_actor.position = Vector2(48, 88)
+	b.add_child(_tour_actor)
+	var q := UiKit.title("?", 30, UiKit.TEXT_ON_ACCENT, 0)
+	var qbox := PanelContainer.new()
+	var qs := StyleBoxFlat.new()
+	qs.bg_color = UiKit.ACCENT
+	qs.set_corner_radius_all(16)
+	qs.content_margin_left = 9
+	qs.content_margin_right = 9
+	qbox.add_theme_stylebox_override("panel", qs)
+	qbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	qbox.add_child(q)
+	qbox.position = Vector2(70, -10)
+	b.add_child(qbox)
+	b.pressed.connect(func():
+		_tour_actor.cheer(0.8)
+		_custom_tour.open())
+	UiFx.hookup_button(b)
+	return b
 
 
+## Step 1: the ready-made prompt for ChatGPT / Gemini / Claude goes straight
+## onto the clipboard; it makes the AI answer in the game's own format.
 func _copy_ai_prompt() -> void:
 	DisplayServer.clipboard_set(CustomQuiz.AI_PROMPT)
-	_custom_status.text = "Prompt copied! Paste it into ChatGPT, Claude or Gemini with your notes, then copy the answer and tap PASTE."
+	_custom_status.text = "Prompt copied! Paste it into ChatGPT, Gemini or Claude with your notes. Then copy the AI's answer and tap 2  PASTE QUESTIONS."
 	_custom_status.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
+	Sfx.play("ui_equip")
 
 
 ## Put the clipboard into the editor (long-press paste is awkward on phones).
@@ -739,6 +845,11 @@ func _enter_custom() -> void:
 			_new_custom()
 		else:
 			_load_custom(sets[0].id)
+	_tour_actor.set_character(Economy.equipped_character)
+	if CustomTutorial.should_auto_open():
+		get_tree().create_timer(0.45).timeout.connect(func():
+			if _current == "custom" and not _custom_tour.visible:
+				_custom_tour.open())
 
 
 func _refresh_custom_list() -> void:
@@ -756,6 +867,7 @@ func _refresh_custom_list() -> void:
 func _new_custom() -> void:
 	_custom_id = ""
 	_custom_title.text = ""
+	_custom_desc.text = ""
 	_custom_text.text = ""
 	_delete_armed = false
 	_custom_delete.disabled = true
@@ -769,10 +881,11 @@ func _load_custom(set_id: String) -> void:
 		return
 	_custom_id = set_id
 	_custom_title.text = data.title
+	_custom_desc.text = String(data.get("desc", ""))
 	_custom_text.text = data.text
 	_delete_armed = false
 	_custom_delete.disabled = false
-	_custom_delete.text = "Delete"
+	_custom_delete.text = "Delete set"
 	_validate_custom()
 	_refresh_custom_list()
 
@@ -785,7 +898,7 @@ func _validate_custom() -> Dictionary:
 	var msg := ""
 	var color := Color(0.55, 1.0, 0.6)
 	if _custom_text.text.strip_edges() == "":
-		msg = "Paste or type your questions, or OPEN FILE (.txt, .csv, Word). Tap FORMAT HELP for an example."
+		msg = "Tap 1 to copy the AI prompt, or type your questions (example above). New here? Tap your character."
 		color = Color(1, 1, 1, 0.75)
 	elif ok > 0 and bad == 0:
 		msg = "%d question%s ready." % [ok, "" if ok == 1 else "s"]
@@ -805,7 +918,7 @@ func _save_custom() -> bool:
 		return false
 	if _custom_title.text.strip_edges() == "":
 		_custom_title.text = "My quiz %d" % (CustomQuiz.list_sets().size() + 1)
-	_custom_id = CustomQuiz.save_set(_custom_title.text, _custom_text.text, _custom_id)
+	_custom_id = CustomQuiz.save_set(_custom_title.text, _custom_text.text, _custom_id, _custom_desc.text)
 	if _validate_custom().questions.size() > 0:
 		Achievements.unlock("quiz_maker")
 	_custom_delete.disabled = false
@@ -857,19 +970,29 @@ func _build_join(ui: CanvasLayer) -> Control:
 func _build_achievements(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
-	_ach_panel = AchievementsPanel.new()
-	_ach_panel.back_pressed.connect(func(): _show(_ach_back))
-	root.add_child(_ach_panel)
-	return root
+	return root # the card itself is made the first time it's opened (_build_lazy)
 
 
 func _build_collection(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
-	_collection_panel = CollectionPanel.new()
-	_collection_panel.back_pressed.connect(func(): _show("main"))
-	root.add_child(_collection_panel)
-	return root
+	return root # the card itself is made the first time it's opened (_build_lazy)
+
+
+## Trophies and Collection are made the first time they're opened, not at
+## start-up: the menu is built behind the black fade, and the Collection's
+## spinning 3D items alone take a quarter of a second (much more on phones).
+func _build_lazy(panel_id: String) -> void:
+	if panel_id == "achievements" and _ach_panel == null:
+		_ach_panel = AchievementsPanel.new()
+		_ach_panel.back_pressed.connect(func(): _show(_ach_back))
+		_panels["achievements"].add_child(_ach_panel)
+		UiFx.shrink(_panels["achievements"])
+	elif panel_id == "collection" and _collection_panel == null:
+		_collection_panel = CollectionPanel.new()
+		_collection_panel.back_pressed.connect(func(): _show("main"))
+		_panels["collection"].add_child(_collection_panel)
+		UiFx.shrink(_panels["collection"])
 
 
 func _build_account(ui: CanvasLayer) -> Control:
@@ -904,36 +1027,8 @@ func _delete_custom() -> void:
 		_custom_delete.text = "Sure?"
 		return
 	CustomQuiz.delete_set(_custom_id)
-	_custom_delete.text = "Delete"
+	_custom_delete.text = "Delete set"
 	_new_custom()
-
-
-func _show_custom_help() -> void:
-	if _custom_text.text.strip_edges() == "":
-		# Empty editor: drop the example in so it can be edited directly.
-		var parts := CustomQuiz.HELP.split("\n\n")
-		_custom_text.text = "\n\n".join(parts.slice(1, 4))
-		_validate_custom()
-	else:
-		_help_dialog.popup_centered(Vector2i(900, 640))
-
-
-func _open_custom_file() -> void:
-	_file_dialog.popup_centered_ratio(0.7)
-
-
-func _on_custom_file(path: String) -> void:
-	var result := CustomQuiz.read_file(path)
-	if result.error != "":
-		_custom_status.text = result.error
-		_custom_status.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
-		return
-	if _custom_id != "" or _custom_text.text.strip_edges() != "":
-		_new_custom()
-	_custom_text.text = result.text
-	if _custom_title.text == "":
-		_custom_title.text = path.get_file().get_basename()
-	_validate_custom()
 
 
 # --- Character / weapon select ----------------------------------------------------
@@ -1012,10 +1107,23 @@ func _build_picker(ui: CanvasLayer, kind: String, heading: String, next_text: St
 		p.wind = UiKit.title("", 32, UiKit.ACCENT, 6)
 		p.wind.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(p.wind)
+	# "Locked  [cap] 750" / "Owned" / "Equipped".
+	var status_row := HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 12)
+	v.add_child(status_row)
 	p.status = UiKit.title("", 40, Color.WHITE, 8)
-	v.add_child(p.status)
+	p.status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	status_row.add_child(p.status)
+	p.status_cap = _cap_icon(52)
+	status_row.add_child(p.status_cap)
+	p.status_price = UiKit.title("", 40, UiKit.ACCENT, 8)
+	p.status_price.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	status_row.add_child(p.status_price)
 	p.buy = UiKit.button("Buy", UiKit.GOLD, 40, Vector2(400, 100))
 	p.buy.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	p.buy.expand_icon = false
+	p.buy.add_theme_constant_override("icon_max_width", 46)
+	p.buy.add_theme_constant_override("h_separation", 12)
 	p.buy.pressed.connect(_on_buy.bind(kind))
 	v.add_child(p.buy)
 
@@ -1074,6 +1182,27 @@ func _browse(kind: String, step: int) -> void:
 		UiFx.bounce(_slipper_icon, 1.2, 0.6)
 
 
+## A bottlecap icon of the given height (for prices).
+func _cap_icon(h: float) -> TextureRect:
+	var r := TextureRect.new()
+	r.texture = CAP_ICON
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.custom_minimum_size = Vector2(h, h)
+	r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+static func _thousands(n: int) -> String:
+	var s := str(absi(n))
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.right(3) + out
+		s = s.left(s.length() - 3)
+	return ("-" if n < 0 else "") + s + out
+
+
 func _refresh_picker(kind: String) -> void:
 	var p: Dictionary = _pickers[kind]
 	var item: Dictionary = p.items[p.index]
@@ -1096,13 +1225,18 @@ func _refresh_picker(kind: String) -> void:
 	if owned:
 		p.status.text = "Equipped" if Economy.equipped(_slot(kind)) == item.id else "Owned"
 	else:
-		p.status.text = "Locked  %d bottlecaps" % item.price
-	var ready := Economy.requirement_met(item.id)
+		p.status.text = "Locked"
+		p.status_price.text = _thousands(item.price)
+	p.status_cap.visible = not owned
+	p.status_price.visible = not owned
+	var unlocked := Economy.requirement_met(item.id)
 	p.buy.visible = not owned
-	p.buy.disabled = not ready or not Economy.can_afford(item.price)
+	p.buy.disabled = not unlocked or not Economy.can_afford(item.price)
 	p.buy.text = ("Confirm  -%d" % item.price) if p.confirm else ("Buy  %d" % item.price)
-	if not ready:
+	p.buy.icon = CAP_ICON # prices come with the bottlecap
+	if not unlocked:
 		p.buy.text = Economy.requirement_text(item.id)
+		p.buy.icon = null
 	elif p.buy.disabled:
 		p.buy.text = "Need %d more" % (item.price - Economy.caps)
 	p.next.disabled = not owned
@@ -1162,10 +1296,13 @@ func _slot(kind: String) -> String:
 func _build_settings(ui: CanvasLayer) -> Control:
 	var root := UiKit.full_rect()
 	ui.add_child(root)
+	# Centred on screen (like the pause menu's card), whatever its height.
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
 	var panel := SettingsPanel.new()
-	panel.position = Vector2(530, 150)
 	panel.back_pressed.connect(func(): _show("main"))
-	root.add_child(panel)
+	center.add_child(panel)
 	return root
 
 

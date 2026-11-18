@@ -15,6 +15,8 @@ extends Node
 ##
 ## Audio goes through two buses made here, "Music" and "SFX" (both feed
 ## "Master"); the Music and Sfx autoloads play on them.
+## Quality: Low, Normal or High (Settings panel). High adds light rays from
+## the sun and moon (SkyBodies); Low is low detail mode:
 ## Low detail mode: no sun shadows, 3D drawn at 75% resolution, and nodes in
 ## the "detail_heavy" group (grass, small plants, far-off houses) hidden.
 ## Nodes in the "blob_shadow" group (round shadows under characters) show only
@@ -29,9 +31,15 @@ var volume := 1.0 ## 0..1, everything
 var music := 0.8 ## 0..1
 var sfx := 1.0 ## 0..1
 var low_detail := false
+## High quality mode: light rays from the sun and moon (SkyBodies).
+var high_quality := false
+var hud_size := "medium" ## size of the in-game HUD: "small", "medium" or "large"
+const HUD_SIZES := {"small": 0.85, "medium": 1.0, "large": 1.15} ## times the normal HUD size
 var fullscreen := false
 ## On-screen joystick and buttons in the game. On by default on phones/tablets.
 var touch_controls := OS.has_feature("mobile")
+## Every tutorial and tip shows each time, even ones closed for good.
+var force_tutorials := false
 
 ## Actions players can rebind in Settings > Controls: [action, label].
 const REMAPPABLE := [
@@ -91,6 +99,31 @@ func set_sfx(v: float) -> void:
 
 func set_low_detail(on: bool) -> void:
 	low_detail = on
+	if on:
+		high_quality = false
+	_apply_detail()
+	_save()
+
+
+## Quality: "low" (low detail mode), "normal", or "high" (adds light rays).
+## The HUD's scale (UiFx.shrink factor) for the chosen HUD size.
+func hud_scale() -> float:
+	return UiFx.UI_SCALE * float(HUD_SIZES.get(hud_size, 1.0))
+
+
+func set_hud_size(s: String) -> void:
+	hud_size = s if HUD_SIZES.has(s) else "medium"
+	_save()
+	changed.emit()
+
+
+func quality() -> String:
+	return "low" if low_detail else ("high" if high_quality else "normal")
+
+
+func set_quality(q: String) -> void:
+	low_detail = q == "low"
+	high_quality = q == "high"
 	_apply_detail()
 	_save()
 
@@ -111,6 +144,12 @@ func set_touch_layout(layout: Dictionary, scale: float) -> void:
 
 func reset_touch_layout() -> void:
 	set_touch_layout({}, 1.0)
+
+
+func set_force_tutorials(on: bool) -> void:
+	force_tutorials = on
+	_save()
+	changed.emit()
 
 
 func set_fullscreen(on: bool) -> void:
@@ -201,10 +240,13 @@ func _save() -> void:
 	cfg.set_value("audio", "music", music)
 	cfg.set_value("audio", "sfx", sfx)
 	cfg.set_value("video", "low_detail", low_detail)
+	cfg.set_value("video", "high_quality", high_quality)
+	cfg.set_value("video", "hud_size", hud_size)
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("controls", "touch", touch_controls)
 	cfg.set_value("controls", "touch_layout", touch_layout)
 	cfg.set_value("controls", "touch_scale", touch_scale)
+	cfg.set_value("tutorials", "force", force_tutorials)
 	var keys := {}
 	for a in REMAPPABLE:
 		var e := _first_key(a[0])
@@ -222,10 +264,15 @@ func _load() -> void:
 	music = cfg.get_value("audio", "music", music)
 	sfx = cfg.get_value("audio", "sfx", sfx)
 	low_detail = cfg.get_value("video", "low_detail", low_detail)
+	high_quality = cfg.get_value("video", "high_quality", false) and not low_detail
+	hud_size = String(cfg.get_value("video", "hud_size", "medium"))
+	if not HUD_SIZES.has(hud_size):
+		hud_size = "medium"
 	fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
 	touch_controls = cfg.get_value("controls", "touch", touch_controls)
 	touch_layout = cfg.get_value("controls", "touch_layout", {})
 	touch_scale = cfg.get_value("controls", "touch_scale", 1.0)
+	force_tutorials = cfg.get_value("tutorials", "force", false)
 	var keys: Dictionary = cfg.get_value("controls", "keys", {})
 	for action in keys:
 		var e := _from_dict(keys[action])
@@ -336,13 +383,13 @@ static func _to_dict(e: InputEvent) -> Dictionary:
 static func _from_dict(d: Dictionary) -> InputEvent:
 	if d.has("mouse"):
 		var m := InputEventMouseButton.new()
-		m.button_index = int(d.mouse)
+		m.button_index = int(d.mouse) as MouseButton
 		m.device = -1 # any device
 		return m
 	if d.has("key") or d.has("physical"):
 		var k := InputEventKey.new()
-		k.keycode = int(d.get("key", 0))
-		k.physical_keycode = int(d.get("physical", 0))
+		k.keycode = int(d.get("key", 0)) as Key
+		k.physical_keycode = int(d.get("physical", 0)) as Key
 		k.device = -1 # any keyboard
 		return k
 	return null

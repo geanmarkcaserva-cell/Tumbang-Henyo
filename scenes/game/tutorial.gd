@@ -9,6 +9,10 @@ extends Node
 ## Copy rule: a headline plus one short line, and the controls as keycaps.
 ## Anything longer belongs on the welcome or done card.
 ##
+## Pacing: every card stays up at least MIN_READ seconds before its step
+## ticks off or the next card replaces it, and the "Nice!" between steps
+## lingers too, so nothing flashes past before it can be read.
+##
 ## The round controller (game.gd) calls the on_*() hooks; the tutorial talks
 ## through the HUD's coach card and highlight ring, and puts a beacon over
 ## the finish line. Keyboard or touch wording follows Settings > Touch controls.
@@ -22,6 +26,10 @@ enum Step { WELCOME, QUIZ, MOVE, AIM, CHARGE, FLYING, RUN, SPRINT, DODGE, DONE }
 
 const TOTAL := 5
 const QUIZ_TIME := 30.0
+## Every card stays up at least this long (seconds) before its step can tick
+## off or the next card can replace it, so there's time to read it even if
+## the player already did the thing.
+const MIN_READ := 2.6
 const OOPS := Color(1.0, 0.62, 0.52)
 const ICON_AWRA := preload("res://art/ui/hud/icon_awra.webp")
 const ICON_TANSAN := preload("res://art/ui/hud/icon_tansan.webp")
@@ -41,6 +49,9 @@ var _aim_turned := 0.0
 var _busy := false ## a "Nice!" is showing; don't advance underneath it
 var _retry := false ## the next throw is a second try (short card)
 var _lata_up := false
+var _card_at := -100.0 ## when the current card went up (seconds, game time)
+var _card_seq := 0 ## newest card request; older ones waiting to show are dropped
+var _clock := 0.0
 
 
 func _exit_tree() -> void:
@@ -105,6 +116,16 @@ func _touch() -> bool:
 ## A coaching card for step n: headline, one short line, controls.
 ## kb / touch: the controls hint for keyboard or the line for touch screens.
 func _coach(n: int, title: String, body: String, kb: Dictionary = {}, touch_line: String = "", extra: Dictionary = {}) -> void:
+	# Let the card that's up now be read first.
+	_card_seq += 1
+	var seq := _card_seq
+	var wait := MIN_READ - (_clock - _card_at)
+	if wait > 0.0:
+		await get_tree().create_timer(wait, false).timeout
+		if seq != _card_seq or not running:
+			return # a newer card came in meanwhile
+	_card_at = _clock
+	_step_time = 0.0 # the step's reading time starts when its card shows
 	var card := {"step": n, "steps": TOTAL, "skip": true, "title": title, "body": body}
 	if _touch():
 		if touch_line != "":
@@ -131,6 +152,9 @@ func on_answer(correct: bool) -> void:
 		return
 	_hud.highlight("")
 	if correct:
+		await _wait_read()
+		if not running:
+			return
 		await _nice("Correct!")
 		if running and step == Step.QUIZ:
 			_hud.coach.hide_card()
@@ -162,6 +186,9 @@ func on_thrown() -> void:
 	_hud.highlight("")
 	if step == Step.CHARGE or step == Step.AIM or step == Step.MOVE:
 		_go(Step.FLYING)
+		await _wait_read()
+		if not running or step != Step.FLYING:
+			return
 		await _nice("Nice throw!")
 		if running and step == Step.FLYING:
 			_hud.coach.hide_card()
@@ -230,25 +257,27 @@ func on_round_clear() -> void:
 # --- Step logic ---------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	_clock += delta
 	if not running or _busy:
 		return
 	_step_time += delta
+	var read := _step_time >= MIN_READ # the card has been up long enough
 	match step:
 		Step.MOVE:
 			var moved := Vector2(_player.global_position.x - _move_start.x, _player.global_position.z - _move_start.z).length()
-			if moved > 1.2 or (_step_time > 8.0 and moved > 0.3):
+			if read and (moved > 1.2 or (_step_time > 8.0 and moved > 0.3)):
 				_step_done(_enter_aim)
 		Step.AIM:
 			var aim: Vector3 = -_player.get_aim_basis().z
 			_aim_turned += _last_aim.angle_to(aim)
 			_last_aim = aim
-			if _aim_turned > 0.45 or _step_time > 7.0:
+			if read and (_aim_turned > 0.45 or _step_time > 7.0):
 				_step_done(_enter_charge)
 		Step.RUN:
-			if _step_time > 1.8:
+			if _step_time > MIN_READ + 0.4:
 				_enter_sprint()
 		Step.SPRINT:
-			if _player.stamina < _player.max_stamina * 0.75:
+			if read and _player.stamina < _player.max_stamina * 0.75:
 				_busy = true
 				await _nice("That's it!")
 				_busy = false
@@ -260,7 +289,7 @@ func _process(delta: float) -> void:
 						_hud.highlight("")
 						_go(Step.DODGE) # waits for the lata to come up
 		Step.DODGE:
-			if _step_time > 6.0 and _lata_up:
+			if _step_time > 6.0 + MIN_READ and _lata_up:
 				_hud.coach.hide_card()
 
 
@@ -310,6 +339,13 @@ func _step_done(next: Callable) -> void:
 	_busy = false
 	if running:
 		next.call()
+
+
+## Waits out the rest of the current card's reading time (see MIN_READ).
+func _wait_read() -> void:
+	var wait := MIN_READ - (_clock - _card_at)
+	if wait > 0.0:
+		await get_tree().create_timer(wait, false).timeout
 
 
 func _nice(text: String = "Nice!") -> Signal:

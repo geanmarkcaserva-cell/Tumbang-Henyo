@@ -17,10 +17,12 @@ const NAME_HINT := "Your name, e.g. Juan"
 
 var _selected := "" ## account shown on the right
 var _list: VBoxContainer
+var _list_scroll: ScrollContainer
 var _count: Label
 var _new_btn: Button
 var _back_btn: Button
 var _cards: Control ## list + details (hidden in welcome mode)
+var _row: HBoxContainer ## the list and the details cards, side by side
 var _avatar: TextureRect
 var _initial: Label
 var _name: Label
@@ -46,23 +48,28 @@ var _ed_mode := "" ## "create", "rename" or "welcome"
 # The picture picker.
 var _pic: Control
 var _pic_preview: TextureRect
+var _pic_letter: Label ## the first letter on the preview of a plain colour badge
 var _pic_colors: HBoxContainer
 var _pic_grid: VBoxContainer
 var _pic_crop: Button
 const SWATCHES := [Color(0.98, 0.72, 0.25), Color(0.4, 0.75, 1.0), Color(0.55, 0.9, 0.5), Color(1.0, 0.5, 0.6),
 		Color(0.75, 0.6, 1.0), Color(1.0, 0.45, 0.25), Color(0.3, 0.85, 0.8), Color(0.92, 0.92, 0.95)]
 
-static var _avatar_cache := {}
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	custom_minimum_size = UiFx.DESIGN
 	size = UiFx.DESIGN
-	_cards = Control.new()
+	# The two cards side by side, centred on screen (both as tall as the taller one).
+	_cards = CenterContainer.new()
 	_cards.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cards.size = UiFx.DESIGN
 	add_child(_cards)
+	_row = HBoxContainer.new()
+	_row.add_theme_constant_override("separation", 40)
+	_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cards.add_child(_row)
 	_build_list()
 	_build_details()
 	_build_editor()
@@ -92,10 +99,9 @@ func cancel() -> bool:
 
 func _build_list() -> void:
 	var card := PanelContainer.new()
-	card.position = Vector2(110, 80)
-	card.custom_minimum_size = Vector2(680, 920)
+	card.custom_minimum_size = Vector2(680, 900)
 	card.add_theme_stylebox_override("panel", UiKit.box())
-	_cards.add_child(card)
+	_row.add_child(card)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 16)
 	card.add_child(v)
@@ -108,10 +114,16 @@ func _build_list() -> void:
 	_count.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_count)
 	v.add_child(UiKit.accent_rule())
+	# The accounts scroll inside the card (up to MAX_ACCOUNTS of them), so the
+	# buttons below never get pushed off screen.
+	_list_scroll = ScrollContainer.new()
+	_list_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_list_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(_list_scroll)
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 12)
-	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(_list)
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list_scroll.add_child(_list)
 	_new_btn = UiKit.button("+ New account", UiKit.GOLD, 38, Vector2(612, 110))
 	_new_btn.pressed.connect(func(): _open_editor("create"))
 	v.add_child(_new_btn)
@@ -123,10 +135,9 @@ func _build_list() -> void:
 
 func _build_details() -> void:
 	var card := PanelContainer.new()
-	card.position = Vector2(830, 80)
-	card.custom_minimum_size = Vector2(980, 920)
+	card.custom_minimum_size = Vector2(980, 900)
 	card.add_theme_stylebox_override("panel", UiKit.box())
-	_cards.add_child(card)
+	_row.add_child(card)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 18)
 	card.add_child(v)
@@ -166,7 +177,7 @@ func _build_details() -> void:
 	_stats = GridContainer.new()
 	_stats.columns = 2
 	_stats.add_theme_constant_override("h_separation", 18)
-	_stats.add_theme_constant_override("v_separation", 14)
+	_stats.add_theme_constant_override("v_separation", 10)
 	_stats.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(_stats)
 
@@ -260,7 +271,10 @@ func refresh() -> void:
 		_list.remove_child(c)
 		c.queue_free()
 	for a in accounts:
-		_list.add_child(_account_row(a))
+		var row := _account_row(a)
+		_list.add_child(row)
+		if a.id == _selected:
+			_list_scroll.ensure_control_visible.call_deferred(row) # keep the picked one in view
 	_count.text = "%d / %d" % [accounts.size(), Accounts.MAX_ACCOUNTS]
 	_new_btn.disabled = not Accounts.can_create()
 	_new_btn.text = "+ New account" if Accounts.can_create() else "Full (%d max)" % Accounts.MAX_ACCOUNTS
@@ -269,10 +283,21 @@ func refresh() -> void:
 
 func _account_row(a: Dictionary) -> Control:
 	var current: bool = a.id == Accounts.current_id()
-	var b := UiKit.button(a.name, UiKit.BLUE, 40, Vector2(612, 122))
+	var b := UiKit.button(a.name, UiKit.BLUE, 40, Vector2(584, 122)) # room for the scroll bar
 	UiKit.set_fill(b, UiKit.BLUE, a.id == _selected)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.icon = avatar_texture(a, 72)
+	# A plain colour badge: the name's first letter on it, like the big picture.
+	if String(a.get("avatar", {}).get("kind", "letter")) == "letter":
+		var letter := UiKit.title(String(a.name).left(1).to_upper(), 40, Color.WHITE, 6)
+		letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		letter.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+		var pad := b.get_theme_stylebox("normal").content_margin_left
+		letter.offset_left = pad
+		letter.offset_right = pad + 72.0
+		b.add_child(letter)
 	b.add_theme_constant_override("h_separation", 22)
 	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	b.pressed.connect(func():
@@ -333,14 +358,14 @@ func _show_details() -> void:
 
 func _stat_tile(caption: String, value: String) -> Control:
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(445, 84)
+	p.custom_minimum_size = Vector2(445, 78)
 	var s := StyleBoxFlat.new()
 	s.bg_color = Color(1, 1, 1, 0.06)
 	s.set_corner_radius_all(14)
 	s.content_margin_left = 22
 	s.content_margin_right = 22
-	s.content_margin_top = 8
-	s.content_margin_bottom = 8
+	s.content_margin_top = 5
+	s.content_margin_bottom = 5
 	p.add_theme_stylebox_override("panel", s)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -358,7 +383,9 @@ func _stat_tile(caption: String, value: String) -> Control:
 static func _duration(seconds: int) -> String:
 	if seconds <= 0:
 		return "-"
+	@warning_ignore("integer_division")
 	var h := seconds / 3600
+	@warning_ignore("integer_division")
 	var m := (seconds % 3600) / 60
 	if h > 0:
 		return "%dh %02dm" % [h, m]
@@ -481,6 +508,12 @@ func _build_picker() -> void:
 	_pic_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_pic_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	head.add_child(_pic_preview)
+	_pic_letter = UiKit.title("", 72, Color.WHITE, 8)
+	_pic_letter.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pic_letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pic_letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_pic_letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pic_preview.add_child(_pic_letter)
 	var hv := VBoxContainer.new()
 	hv.alignment = BoxContainer.ALIGNMENT_CENTER
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -520,6 +553,8 @@ func _fill_picker() -> void:
 		return
 	_pic_preview.texture = avatar_texture(a, 150)
 	var current_av: Dictionary = a.get("avatar", {"kind": "letter"})
+	_pic_letter.text = String(a.name).left(1).to_upper()
+	_pic_letter.visible = String(current_av.get("kind", "letter")) == "letter"
 	_pic_crop.disabled = String(current_av.get("kind", "letter")) == "letter"
 	for c in _pic_colors.get_children():
 		c.queue_free()
@@ -573,7 +608,7 @@ func _open_cropper() -> void:
 		auto = Avatars.face_rect(src)
 	else:
 		var side := maxi(src.get_width(), src.get_height())
-		auto = Rect2i((src.get_width() - side) / 2, (src.get_height() - side) / 2, side, side)
+		auto = Rect2i((src.get_width() - side) >> 1, (src.get_height() - side) >> 1, side, side)
 	var start := Avatars.crop_rect(src, av.crop) if (av.get("crop", []) as Array).size() == 3 else auto
 	var cropper := AvatarCropper.new()
 	_pic.add_child(cropper)

@@ -23,12 +23,17 @@ var _t := 0.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	custom_minimum_size = Vector2(1920, 1080)
+	# The card grows to fit what's in it (so the buttons always sit inside
+	# it) and stays in the middle of the screen.
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(center)
 	var card := PanelContainer.new()
-	card.position = Vector2(470, 110)
-	card.custom_minimum_size = Vector2(980, 840)
+	card.custom_minimum_size = Vector2(980, 0)
 	card.add_theme_stylebox_override("panel", UiKit.box(UiKit.PANEL_DARK, Color(0.3, 0.3, 0.32), 10, 8))
-	add_child(card)
-	var stack := Control.new()
+	center.add_child(card)
+	var stack := MarginContainer.new() # sized by whichever page is showing now
 	card.add_child(stack)
 
 	# --- Join form ---
@@ -53,11 +58,9 @@ func _ready() -> void:
 	_form.add_child(_code)
 	_status = UiKit.label("Ask your teacher for the ID. You need to be on the same WiFi.", 28, Color(1, 1, 1, 0.65), 0)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.custom_minimum_size = Vector2(920, 90)
+	_status.custom_minimum_size = Vector2(920, 70)
 	_form.add_child(_status)
-	var fill := Control.new()
-	fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_form.add_child(fill)
+	_form.add_child(_gap(6))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 24)
 	_form.add_child(row)

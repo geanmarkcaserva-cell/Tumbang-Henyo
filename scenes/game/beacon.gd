@@ -74,7 +74,7 @@ func _ready() -> void:
 func _add_beam(shader: Shader, radius: float, col: Color, strength: float, soft: float) -> void:
 	var mi := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
-	cyl.top_radius = radus
+	cyl.top_radius = radius
 	cyl.bottom_radius = radius
 	cyl.height = HEIGHT
 	cyl.radial_segments = 12

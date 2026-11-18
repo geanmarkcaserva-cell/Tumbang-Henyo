@@ -29,7 +29,7 @@ const TRAIL_STEP := 0.8
 const TRAIL_MAX := 300
 const PROJECTILE_SPEED := 17.0
 const AIM_SCATTER := 0.7
-## Shout text -> her recorded line (drop the files into art/Audio/sfx).
+## Shout text -> her recorded line (drop the files into art/audio/sfx).
 const SHOUT_VOICES := {
 	"HEY! GET OVER HERE!": "voice_mama_halika",
 	"HEY!": "voice_mama_hoy",
@@ -176,10 +176,10 @@ func _ready() -> void:
 	add_child(_shout)
 
 
-## Her sheets live in art/characters/Mom (mom_idle.png: front, belt up;
+## Her sheets live in art/characters/mom (mom_idle.png: front, belt up;
 ## mom_run.png: back). Edit those to change how she looks; without them she
 ## is drawn from the pixel rows below.
-const SPRITE_DIR := "res://art/characters/Mom"
+const SPRITE_DIR := "res://art/characters/mom"
 
 
 func _load_look() -> Dictionary:
@@ -262,7 +262,7 @@ func _process(delta: float) -> void:
 func _shout_now(text: String) -> void:
 	_shout.text = text
 	_shout_t = 0.0
-	# Her voice, once recorded (art/Audio/sfx/voice_mama_*.wav; silent until then).
+	# Her voice, once recorded (art/audio/sfx/voice_mama_*.wav; silent until then).
 	var voice: String = SHOUT_VOICES.get(text, "")
 	if voice != "":
 		Sfx.play_at(voice, global_position, 6.0, 1.0, 0.0)

@@ -161,7 +161,7 @@ static func _empty_rows_above(tex: Texture2D) -> int:
 	return 0
 
 
-## One sheet for every state: the barangay folk (art/characters/Npc*) are
+## One sheet for every state: the barangay folk (art/characters/npc*) are
 ## drawn facing front only. Cached by path.
 static func single_sheet_look(path: String, fps: float = 5.0) -> Dictionary:
 	if _looks.has(path):
@@ -207,7 +207,7 @@ static func slipper(p: Dictionary) -> ImageTexture:
 	return ImageTexture.create_from_image(_image(SLIPPER, {"S": p.sole, "D": p.sole.darkened(0.3), "T": p.strap}))
 
 
-## A catalog slipper's picture: its hand-drawn icon from art/Slippers when
+## A catalog slipper's picture: its hand-drawn icon from art/slippers when
 ## it has one, otherwise the generated placeholder from its palette.
 static func slipper_texture(item: Dictionary) -> Texture2D:
 	var icon: String = item.get("icon", "")

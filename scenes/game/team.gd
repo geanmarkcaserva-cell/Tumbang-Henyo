@@ -1,11 +1,11 @@
 class_name Team
 extends RefCounted
-## The people who made Tumbang Henyo. Each has a sprite in art/characters/Team
+## The people who made Tumbang Henyo. Each has a sprite in art/characters/team
 ## (their photo head on a pixel body). They stand in a row on the street west of the court
 ## in the menu (Credits zooms in on each one) and stroll around the barangay
 ## like the NPCs during a game, with their nickname over their head.
 
-const SHEET_DIR := "res://art/characters/Team/"
+const SHEET_DIR := "res://art/characters/team/"
 
 const MEMBERS := [
 	{"id": "gm", "name": "Gean Mark Caserva", "nick": "GM", "title": "Team Leader",

@@ -15,7 +15,7 @@ const SAVE_FILE := "achievements.cfg"
 const RESET_ON_LAUNCH := false
 const SHOW_TIME := 4.2 ## seconds each popup stays up
 const SLIDE_TIME := 0.35
-const CHIME_PATH := "res://art/Audio/sfx/achievement.wav"
+const CHIME_PATH := "res://art/audio/sfx/achievement.wav"
 
 ## tier: bronze / silver / gold / platinum. secret: name and text hidden until unlocked.
 ## stat + goal: unlocks by itself when that running total reaches goal.

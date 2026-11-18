@@ -3,17 +3,17 @@ extends Node
 ## Music.play("menu") / Music.play("game"). If the new track is the same song
 ## that's already playing it just keeps going; otherwise it crossfades.
 ##
-## To give gameplay its own song later: put the file in art/Audio and change
+## To give gameplay its own song later: put the file in art/audio and change
 ## the "game" entry below.
 
 ## Drop a file at a track's path and it's used; until then the track falls
 ## back to FALLBACK (see docs/AUDIO.md).
 const TRACKS := {
 	# Both are cut on whole bars so the loop point lands on the beat with no gap.
-	"menu": "res://art/Audio/music/menu_loop.ogg",
-	"game": "res://art/Audio/music/game.ogg", # gameplay song (not made yet)
-	"running": "res://art/Audio/music/running_loop.ogg", # after a lata hit
-	"mama": "res://art/Audio/music/mama_chase.ogg", # Mama's chase (not made yet)
+	"menu": "res://art/audio/music/menu_loop.ogg",
+	"game": "res://art/audio/music/game.ogg", # gameplay song (not made yet)
+	"running": "res://art/audio/music/running_loop.ogg", # after a lata hit
+	"mama": "res://art/audio/music/mama_chase.ogg", # Mama's chase (not made yet)
 }
 const FALLBACK := {
 	"game": "menu",

@@ -1,7 +1,7 @@
 class_name Npc
 extends CharacterBody3D
 ## Barangay folk: kids, lolos and lolas, vendors... one for every sheet in the
-## art/characters/Npc* folders (drop a new sheet in one of those folders and
+## art/characters/npc* folders (drop a new sheet in one of those folders and
 ## they're in the next game). Each shows up once per game - a few on the
 ## court, the rest out in the streets - then strolls around the barangay on the
 ## navigation mesh, and now and then walks to a house, goes in, and comes back
@@ -38,7 +38,7 @@ var _barangay: Node
 var _ground_t := 0
 
 
-## Every NPC sheet in the art/characters/Npc* folders, each listed once.
+## Every NPC sheet in the art/characters/npc* folders, each listed once.
 static func sheets() -> PackedStringArray:
 	var out := PackedStringArray()
 	var root := DirAccess.open(SHEET_ROOT)

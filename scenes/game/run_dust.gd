@@ -9,9 +9,9 @@ extends Node3D
 ## day's light (set_tint), and low detail mode makes half as many.
 
 const SEQUENCE := [
-	preload("res://art/environment/run smoke var 1.png"),
-	preload("res://art/environment/run smoke var 2.png"),
-	preload("res://art/environment/run smoke var 3.png"),
+	preload("res://art/environment/fx/run smoke var 1.png"),
+	preload("res://art/environment/fx/run smoke var 2.png"),
+	preload("res://art/environment/fx/run smoke var 3.png"),
 ]
 const FRAME_ENDS := [0.33, 0.66] ## share of a puff's life where it switches to var 2, then var 3
 const POOL := 48 ## puffs alive at once (the oldest is reused)

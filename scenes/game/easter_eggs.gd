@@ -326,22 +326,22 @@ const ICON_COLORS := {
 }
 
 
-## The hand-drawn icons (art/ui/Easter egg icons) and 3D models
-## (art/Easter Egg assets). Models are scaled so their longest side is
+## The hand-drawn icons (art/ui/easter_egg_icons) and 3D models
+## (art/easter_eggs). Models are scaled so their longest side is
 ## MODEL_SIZE metres and stood on the ground (y = 0), centred.
 const ICON_FILES := {
-	"trumpo": "res://art/ui/Easter egg icons/Trumpo.png",
-	"golden_tsinelas": "res://art/ui/Easter egg icons/Golden Slipper.png",
-	"tungkod": "res://art/ui/Easter egg icons/Cane.png",
-	"saranggola": "res://art/ui/Easter egg icons/Kite.png",
-	"holen": "res://art/ui/Easter egg icons/Jolen.png",
+	"trumpo": "res://art/ui/easter_egg_icons/Trumpo.png",
+	"golden_tsinelas": "res://art/ui/easter_egg_icons/Golden Slipper.png",
+	"tungkod": "res://art/ui/easter_egg_icons/Cane.png",
+	"saranggola": "res://art/ui/easter_egg_icons/Kite.png",
+	"holen": "res://art/ui/easter_egg_icons/Jolen.png",
 }
 const MODEL_FILES := {
-	"trumpo": "res://art/Easter Egg assets/trumpo.glb",
-	"golden_tsinelas": "res://art/Easter Egg assets/Golden Tsinelas.glb",
-	"tungkod": "res://art/Easter Egg assets/Sungkod.glb",
-	"saranggola": "res://art/Easter Egg assets/kite.glb",
-	"holen": "res://art/Easter Egg assets/jolens.glb",
+	"trumpo": "res://art/easter_eggs/trumpo.glb",
+	"golden_tsinelas": "res://art/easter_eggs/Golden Tsinelas.glb",
+	"tungkod": "res://art/easter_eggs/Sungkod.glb",
+	"saranggola": "res://art/easter_eggs/kite.glb",
+	"holen": "res://art/easter_eggs/jolens.glb",
 }
 const MODEL_SIZE := {"trumpo": 0.45, "golden_tsinelas": 0.5, "tungkod": 1.0, "saranggola": 0.8, "holen": 0.6}
 

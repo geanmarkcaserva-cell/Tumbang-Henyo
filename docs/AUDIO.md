@@ -1,7 +1,7 @@
 # Tumbang Henyo: audio list
 
-Every sound effect is a file in `art/Audio/sfx/`, named after the sound.
-`Sfx.play("name")` plays `art/Audio/sfx/name.wav` (or `.ogg` / `.mp3`).
+Every sound effect is a file in `art/audio/sfx/`, named after the sound.
+`Sfx.play("name")` plays `art/audio/sfx/name.wav` (or `.ogg` / `.mp3`).
 Numbered files (`step_1`, `step_2`, ...) are variants picked at random.
 
 **To replace a sound:** drop a new file with the same name in the folder.
@@ -9,7 +9,7 @@ Numbered files (`step_1`, `step_2`, ...) are variants picked at random.
 already calls these names and stays silent until the file exists.
 
 The generated sounds come from `tools/make_sfx.py`
-(`python tools/make_sfx.py art/Audio/sfx` rebuilds them).
+(`python tools/make_sfx.py art/audio/sfx` rebuilds them).
 
 Status: **made** = generated and in the game. **needs file** = hooked up,
 waiting for a recording or a composed track.
@@ -117,9 +117,9 @@ and the game picks one at random.
 
 | File | What | Status |
 |---|---|---|
-| art/Audio/Bg music default.mp3 | Menu (and game, for now) | exists |
-| art/Audio/music/game.ogg | Gameplay loop: light, playful, OPM/kalye feel, ~100-110 BPM | needs file (falls back to the menu song) |
-| art/Audio/music/mama_chase.ogg | Mama's chase: tense, faster, ~140 BPM, 30 s+ loop | needs file (falls back to the gameplay song) |
+| art/audio/Bg music default.mp3 | Menu (and game, for now) | exists |
+| art/audio/music/game.ogg | Gameplay loop: light, playful, OPM/kalye feel, ~100-110 BPM | needs file (falls back to the menu song) |
+| art/audio/music/mama_chase.ogg | Mama's chase: tense, faster, ~140 BPM, 30 s+ loop | needs file (falls back to the gameplay song) |
 
 Loop points: export OGG files with clean loops (start and end on the beat).
 The game sets them to loop by itself.

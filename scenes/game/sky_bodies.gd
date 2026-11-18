@@ -13,8 +13,8 @@ extends Node3D
 ## Works anywhere with a DirectionalLight3D: the game (with DayNight) and the
 ## main menu (golden hour, always the sun).
 
-const SUN_TEX := preload("res://art/environment/Sun.png")
-const MOON_TEX := preload("res://art/environment/Moon.png")
+const SUN_TEX := preload("res://art/environment/sky/Sun.png")
+const MOON_TEX := preload("res://art/environment/sky/Moon.png")
 const RAYS_SHADER := preload("res://scenes/game/light_rays.gdshader")
 const CLOUD_SHADER := preload("res://scenes/game/sky_cloud.gdshader") ## dark body, sunlit rim
 const DISTANCE := 260.0 ## metres from the camera (the game camera draws up to 300)
@@ -27,9 +27,9 @@ const GLOW_SCALE := 3.2 ## the glow around them, times their size
 ## tilt or slide them). They drift slowly round the dome, a little closer than
 ## the sun so they can pass in front of it. Hidden in low detail mode.
 const CLOUD_TEXTURES := [
-	preload("res://art/environment/Cloud var 1.png"),
-	preload("res://art/environment/Cloud var 2.png"),
-	preload("res://art/environment/Cloud var 3.png"),
+	preload("res://art/environment/sky/Cloud var 1.png"),
+	preload("res://art/environment/sky/Cloud var 2.png"),
+	preload("res://art/environment/sky/Cloud var 3.png"),
 ]
 const CLOUD_COUNT := 12 ## (4 of each picture)
 const CLOUD_DISTANCE := 230.0

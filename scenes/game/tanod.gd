@@ -42,7 +42,7 @@ const DASH_WIDTH := 1.7
 const DASH_RECOVER := 0.7
 const DASH_COOLDOWN := Vector2(4.5, 6.0)
 
-const SPRITE_DIR := "res://art/characters/Tanod"
+const SPRITE_DIR := "res://art/characters/tanod"
 const NAVY := {"hair": Color(0.1, 0.13, 0.3), "band": Color(1.0, 0.82, 0.25), "skin": Color(0.74, 0.52, 0.38),
 		"shirt": Color(0.12, 0.16, 0.36), "accent": Color(1.0, 0.82, 0.25), "pants": Color(0.08, 0.1, 0.22), "feet": Color(0.05, 0.05, 0.06)}
 const ORANGE := {"hair": Color(0.1, 0.13, 0.3), "band": Color(1.0, 0.82, 0.25), "skin": Color(0.7, 0.5, 0.36),
@@ -89,7 +89,7 @@ func _ready() -> void:
 	_doll.shadow_radius = 0.5
 	add_child(_doll)
 	var p: Dictionary = ORANGE if kind == Kind.DASHER else NAVY
-	# Sheets in art/characters/Tanod (tanod_thrower_idle.png = front,
+	# Sheets in art/characters/tanod (tanod_thrower_idle.png = front,
 	# tanod_thrower_run.png = back; same for the dasher). Edit those to change
 	# them; without them they're drawn from the palette.
 	var id := "tanod_dasher" if kind == Kind.DASHER else "tanod_thrower"

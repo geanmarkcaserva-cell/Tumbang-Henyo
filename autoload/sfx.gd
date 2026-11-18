@@ -1,6 +1,6 @@
 extends Node
-## Sound effects. Every sound is a file in art/Audio/sfx named after it:
-## Sfx.play("lata_hit") plays art/Audio/sfx/lata_hit.wav (or .ogg / .mp3).
+## Sound effects. Every sound is a file in art/audio/sfx named after it:
+## Sfx.play("lata_hit") plays art/audio/sfx/lata_hit.wav (or .ogg / .mp3).
 ##
 ## - Variants: step_1, step_2, ... are picked at random by Sfx.play("step").
 ## - A name with no file yet stays silent. Voice lines and new sounds can be
@@ -11,12 +11,12 @@ extends Node
 ##   click, disabled ones a "nope" buzz). Set the "sfx_skip" meta to opt out.
 ## - Every slider ticks as it moves.
 
-const DIR := "res://art/Audio/sfx/"
+const DIR := "res://art/audio/sfx/"
 const EXTS := ["wav", "ogg", "mp3"]
 ## Sounds that live outside the sfx folder.
 const LEGACY := {
-	"correct": "res://art/Audio/Correct answer.mp3",
-	"wrong": "res://art/Audio/Wrong answer.mp3",
+	"correct": "res://art/audio/sfx/correct.mp3",
+	"wrong": "res://art/audio/sfx/wrong.mp3",
 }
 ## Loaded up front so nothing hitches the first time it plays.
 const PRELOAD := [
